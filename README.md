@@ -4,108 +4,117 @@
 
 ### 1.1 Visão Geral da Arquitetura
 
-A arquitetura proposta segue um padrão de **Microserviços com Event-Driven Architecture**, combinando os princípios de **CQRS (Command Query Responsibility Segregation)** e **Event Sourcing** parcial para garantir escalabilidade e rastreabilidade.
+A arquitetura proposta segue um padrão de **Microsserviços com Event-Driven Architecture**, combinando os princípios de **CQRS (Command Query Responsibility Segregation)** e **Event Sourcing** parcial para garantir escalabilidade e rastreabilidade.
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                        CAMADA DE ENTRADA                         │
-├──────────────────────────────────────────────────────────────────┤
-│  Load Balancer (HAProxy/Nginx)                                   │
-│         ↓                    ↓                    ↓              │
-│   API Gateway 1        API Gateway 2        API Gateway N        │
-│   (PHP-FPM + Nginx)    (PHP-FPM + Nginx)   (PHP-FPM + Nginx)     │
-└──────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                    CAMADA DE ENTRADA                         │
+├──────────────────────────────────────────────────────────────┤
+│  Load Balancer (HAProxy/Nginx)                               │
+│         ↓                    ↓                    ↓          │
+│   API Gateway 1        API Gateway 2        API Gateway N    │
+│  (Kong/Tyk/KrakenD)  (Kong/Tyk/KrakenD)   (Kong/Tyk/KrakenD) │
+└──────────────────────────────────────────────────────────────┘
                               ↓
-┌──────────────────────────────────────────────────────────────────┐
-│                     CAMADA DE SERVIÇOS CORE                      │
-├──────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  ┌─────────────────┐  ┌──────────────────┐  ┌────────────────┐   │
-│  │ Auth Service    │  │ Frontend Service │  │ Presence       │   │
-│  │ (gRPC Server)   │  │ (gRPC Server)    │  │ Service        │   │
-│  │ PHP 8.4         │  │ PHP 8.4          │  │ (gRPC/PHP)     │   │
-│  └─────────────────┘  └──────────────────┘  └────────────────┘   │
-│                                                                  │
-│  ┌─────────────────┐  ┌──────────────────┐  ┌────────────────┐   │
-│  │ Conversation    │  │ Message          │  │ File           │   │
-│  │ Service         │  │ Service          │  │ Service        │   │
-│  │ (gRPC Server)   │  │ (gRPC Server)    │  │ (gRPC/PHP)     │   │
-│  └─────────────────┘  └──────────────────┘  └────────────────┘   │
-└──────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                 CAMADA DE SERVIÇOS CORE                      │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────┐  │
+│  │ Auth Service    │  │ Frontend Service│  │ Presence     │  │
+│  │ (gRPC Server)   │  │ (gRPC Server)   │  │ Service      │  │
+│  │ RoadRunner/PHP  │  │ RoadRunner/PHP  │  │ (gRPC/PHP)   │  │
+│  └─────────────────┘  └─────────────────┘  └──────────────┘  │
+│                                                              │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────┐  │
+│  │ Conversation    │  │ Message         │  │ File         │  │
+│  │ Service         │  │ Service         │  │ Service      │  │
+│  │ (gRPC Server)   │  │ (gRPC Server)   │  │ (gRPC/PHP)   │  │
+│  └─────────────────┘  └─────────────────┘  └──────────────┘  │
+└──────────────────────────────────────────────────────────────┘
                               ↓
-┌──────────────────────────────────────────────────────────────────┐
-│                    CAMADA DE MENSAGERIA                          │
-├──────────────────────────────────────────────────────────────────┤
-│              Apache Kafka (Event Stream)                         │
-│  Topics: message.sent, message.delivered, message.read,          │
-│          file.uploaded, user.presence, conversation.created      │
-└──────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│              CAMADA DE COMUNICAÇÃO REAL-TIME                 │
+├──────────────────────────────────────────────────────────────┤
+│  WebSocket Gateway (Swoole)                                  │
+│  - Mantém conexões WebSocket dos clientes                    │
+│  - Subscribe no Redis Pub/Sub                                │
+│  - Envia mensagens real-time para Angular                    │
+└──────────────────────────────────────────────────────────────┘
                               ↓
-┌──────────────────────────────────────────────────────────────────┐
-│                    CAMADA DE WORKERS                             │
-├──────────────────────────────────────────────────────────────────┤
-│  ┌─────────────────┐  ┌──────────────────┐  ┌────────────────┐   │
-│  │ Router Worker   │  │ Delivery Worker  │  │ Status         │   │
-│  │ (PHP Consumer)  │  │ (PHP Consumer)   │  │ Worker         │   │
-│  └─────────────────┘  └──────────────────┘  └────────────────┘   │
-└──────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                    CAMADA DE MENSAGERIA                      │
+├──────────────────────────────────────────────────────────────┤
+│              Apache Kafka (Event Stream)                     │
+│  Topics: message.sent, message.delivered, message.read,      │
+│          file.uploaded, user.presence, conversation.created  │
+└──────────────────────────────────────────────────────────────┘
                               ↓
-┌──────────────────────────────────────────────────────────────────┐
-│                  CAMADA DE CONNECTORS                            │
-├──────────────────────────────────────────────────────────────────┤
-│  ┌─────────────────┐  ┌──────────────────┐  ┌────────────────┐   │
-│  │ WhatsApp        │  │ Instagram        │  │ Telegram       │   │
-│  │ Connector       │  │ Connector        │  │ Connector      │   │
-│  │ (Plugin/PHP)    │  │ (Plugin/PHP)     │  │ (Plugin/PHP)   │   │
-│  └─────────────────┘  └──────────────────┘  └────────────────┘   │
-└──────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                    CAMADA DE WORKERS                         │
+├──────────────────────────────────────────────────────────────┤
+│  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────┐  │
+│  │ Router Worker   │  │ Delivery Worker │  │ Status       │  │
+│  │ (PHP Consumer)  │  │ (PHP Consumer)  │  │ Worker       │  │
+│  └─────────────────┘  └─────────────────┘  └──────────────┘  │
+└──────────────────────────────────────────────────────────────┘
                               ↓
-┌──────────────────────────────────────────────────────────────────┐
-│                  CAMADA DE PERSISTÊNCIA                          │
-├──────────────────────────────────────────────────────────────────┤
-│  ┌──────────────────────┐  ┌─────────────────────────────────┐   │
-│  │ PostgreSQL Cluster   │  │ MongoDB Cluster                 │   │
-│  │ (Metadata, Users,    │  │ (Messages, Conversations,       │   │
-│  │  Conversations)      │  │  History)                       │   │
-│  └──────────────────────┘  └─────────────────────────────────┘   │
-│                                                                  │
-│  ┌──────────────────────┐  ┌─────────────────────────────────┐   │
-│  │ Redis Cluster        │  │ MinIO (S3-Compatible)           │   │
-│  │ (Cache, Sessions,    │  │ (Object Storage para arquivos)  │   │
-│  │  Presence)           │  │                                 │   │
-│  └──────────────────────┘  └─────────────────────────────────┘   │
-│                                                                  │
-│  ┌──────────────────────────────────────────────────────────┐    │
-│  │ etcd Cluster (Service Discovery, Config, Coordination)   │    │
-│  └──────────────────────────────────────────────────────────┘    │
-└──────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                  CAMADA DE CONNECTORS                        │
+├──────────────────────────────────────────────────────────────┤
+│  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────┐  │
+│  │ WhatsApp        │  │ Instagram       │  │ Telegram     │  │
+│  │ Connector       │  │ Connector       │  │ Connector    │  │
+│  │ (Plugin/PHP)    │  │ (Plugin/PHP)    │  │ (Plugin/PHP) │  │
+│  └─────────────────┘  └─────────────────┘  └──────────────┘  │
+└──────────────────────────────────────────────────────────────┘
                               ↓
-┌──────────────────────────────────────────────────────────────────┐
-│                  CAMADA DE OBSERVABILIDADE                       │
-├──────────────────────────────────────────────────────────────────┤
-│  Prometheus + Grafana + Jaeger + ELK Stack                       │
-└──────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                  CAMADA DE PERSISTÊNCIA                      │
+├──────────────────────────────────────────────────────────────┤
+│  ┌──────────────────────┐  ┌───────────────────────────────┐ │
+│  │ PostgreSQL Cluster   │  │ MongoDB Cluster               │ │
+│  │ (Metadata, Users,    │  │ (Messages, Time Series)       │ │
+│  │  Conversations)      │  │                               │ │
+│  └──────────────────────┘  └───────────────────────────────┘ │
+│                                                              │
+│  ┌──────────────────────┐  ┌───────────────────────────────┐ │
+│  │ Redis Cluster        │  │ MinIO (S3-Compatible)         │ │
+│  │ (Cache, Sessions,    │  │ (Object Storage para arquivos)│ │
+│  │  Presence, Pub/Sub)  │  │                               │ │
+│  └──────────────────────┘  └───────────────────────────────┘ │
+│                                                              │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │ etcd Cluster (Leader Election, Feature Flags, Config)  │  │
+│  └────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────┘
+                              ↓
+┌──────────────────────────────────────────────────────────────┐
+│                  CAMADA DE OBSERVABILIDADE                   │
+├──────────────────────────────────────────────────────────────┤
+│  Prometheus + Grafana + Jaeger + ELK Stack                   │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ### 1.2 Justificativas das Escolhas Arquiteturais
 
-#### 1.2.1 Por que PHP 8.4?
+#### 1.2.1 Por que PHP 8.4 com RoadRunner?
 
 **Vantagens:**
 
 - **Performance Moderna**: PHP 8.4 com JIT compiler oferece performance comparável a linguagens tradicionalmente mais rápidas (até 3x mais rápido que PHP 7.x)
+- **RoadRunner Application Server**: Escrito em Go, gerencia workers PHP com true non-blocking I/O, connection pooling e hot-reloading
 - **Tipagem Forte**: Suporte robusto a tipos (Property Hooks, readonly classes) reduz bugs em sistemas distribuídos
 - **Ecossistema Maduro**: Bibliotecas consolidadas para todas as necessidades (gRPC, Kafka, Redis, MongoDB)
 - **Baixa Curva de Aprendizado**: Facilita onboarding de desenvolvedores
-- **Async/Parallel**: Extensões como Swoole, ReactPHP e Amp permitem operações assíncronas nativas
 - **Custo**: Menor custo de infraestrutura comparado a linguagens que requerem mais recursos
 
-**Por que é a melhor escolha:**
+**Por que RoadRunner:**
 
-- **Escalabilidade**: PHP-FPM com pool de workers escala horizontalmente de forma trivial
-- **Microserviços**: Cada serviço pode ser deployado independentemente
-- **gRPC Nativo**: Suporte oficial via extensão grpc
-- **Maturidade em Web**: Frameworks como Symfony, Laravel oferecem componentes enterprise-grade
+- Serve gRPC, HTTP e executa consumidores Kafka usando o mesmo binário
+- Gerencia lifecycle dos workers PHP automaticamente
+- Drasticamente mais performático que PHP-FPM ou loops while(true) em CLI
+- Suporte nativo a recarregamento de código sem downtime
 
 #### 1.2.2 Por que gRPC?
 
@@ -113,16 +122,14 @@ A arquitetura proposta segue um padrão de **Microserviços com Event-Driven Arc
 
 - **Performance**: Protocol Buffers (binário) são até 7x menores que JSON e 20x mais rápidos no parsing
 - **Tipagem Forte**: Contratos definidos em `.proto` garantem compatibilidade entre serviços
-- **Streaming Bidirecional**: Essencial para real-time messaging
 - **Multiplexing HTTP/2**: Múltiplas chamadas simultâneas na mesma conexão
 - **Code Generation**: Gera automaticamente clients/servers em múltiplas linguagens
 
-**Por que é a melhor escolha:**
+**Importante sobre Frontend:**
 
-- **Baixa Latência**: Crítico para atingir <200ms de latência
-- **Interoperabilidade**: Facilita integração futura com serviços em outras linguagens
-- **Versioning**: Backward compatibility nativo do Protobuf
-- **Load Balancing**: Suporte nativo a múltiplas estratégias
+- **gRPC-Web não suporta streaming bidirecional** (apenas unário e server streaming)
+- Para comunicação real-time com o frontend Angular, utilizamos **WebSocket Gateway dedicado** que consome do Redis Pub/Sub
+- gRPC é usado exclusivamente para comunicação entre microsserviços backend
 
 #### 1.2.3 Por que Apache Kafka?
 
@@ -134,111 +141,85 @@ A arquitetura proposta segue um padrão de **Microserviços com Event-Driven Arc
 - **Particionamento**: Preserva ordem causal por conversation_id
 - **Escalabilidade Linear**: Adicionar brokers aumenta capacidade proporcionalmente
 
-**Por que é a melhor escolha:**
+#### 1.2.4 Por que API Gateway Dedicado (Kong/Tyk/KrakenD)?
 
-- **At-least-once Delivery**: Com idempotência alcança effectively-once
-- **Consumer Groups**: Múltiplos workers processam paralelamente
-- **Backpressure**: Não perde mensagens em picos de carga
-- **Ecosystem**: Kafka Connect facilita integrações futuras
+**Vantagens sobre PHP Middleware:**
 
-#### 1.2.4 Por que PostgreSQL + MongoDB (Polyglot Persistence)?
+- **Performance**: Escritos em Go/Lua, otimizados para latência sub-milissegundo
+- **Edge Logic Nativa**: Autenticação JWT, rate limiting e gRPC-Web transcoding sem overhead de PHP
+- **Escalabilidade**: Remove a sobrecarga de inicializar PHP para cada requisição de API
+- **Features Enterprise**: Circuit breaker, service mesh, analytics integrados
+
+#### 1.2.5 Por que PostgreSQL + MongoDB (Polyglot Persistence)?
 
 **PostgreSQL para:**
 
 - **Dados Relacionais**: Users, conversations metadata, channel mappings
 - **ACID Transactions**: Garantias fortes onde necessário
 - **JSON Support**: JSONB para dados semi-estruturados
-- **Replicação**: Streaming replication para HA
+- **Desnormalização**: Coluna last_message_snippet na tabela conversations para queries eficientes
 
 **MongoDB para:**
 
 - **Mensagens**: Schema flexível, write-heavy workload
-- **Escalabilidade Horizontal**: Sharding nativo por conversation_id
-- **Time-Series**: Otimizado para dados temporais
+- **Time Series Collections**: Suporte nativo desde MongoDB 5.0+ para conversation_history (substitui bucketing manual)
+- **Sharding Otimizado**: Chave composta `{ conversation_id: 1, created_at: 1 }` evita hot shards
 - **Aggregation Pipeline**: Queries analíticas eficientes
 
-**Por que Polyglot:**
-
-- **Best Tool for the Job**: Cada banco otimizado para seu use case
-- **Isolation**: Problemas em um não afetam o outro
-- **Performance**: Queries otimizadas por natureza dos dados
-
-#### 1.2.5 Por que Redis?
+#### 1.2.6 Por que Redis com TTL?
 
 **Vantagens:**
 
 - **Velocidade**: Operações em memória (sub-milissegundo)
-- **Estruturas de Dados Ricas**: Hashes, Sets, Sorted Sets
-- **Pub/Sub**: Para real-time presence
-- **Persistência Opcional**: RDB/AOF para durabilidade
+- **Pub/Sub**: Para real-time presence e mensagens (consumido pelo WebSocket Gateway)
+- **Presença Simplificada**: Hashes com TTL automático eliminam necessidade de Sorted Sets e jobs de cleanup
 
-**Uso no Projeto:**
+**Uso Otimizado:**
 
-- **Session Storage**: Tokens JWT com TTL
-- **Cache**: Metadados frequentes (user profiles, conversation info)
-- **Presence Tracking**: Online/offline status
-- **Rate Limiting**: Token bucket algorithm
-- **Deduplication**: Set para message_ids recentes
+```
+HSET presence:user:{user_id} status online
+EXPIRE presence:user:{user_id} 300  # 5 minutos
+```
 
-#### 1.2.6 Por que MinIO?
+#### 1.2.7 Por que etcd (uso refinado)?
 
-**Vantagens:**
+**Uso Focado (quando usando Kubernetes):**
 
-- **S3-Compatible**: API idêntica ao AWS S3
-- **Self-Hosted**: Controle total dos dados
-- **Performance**: Escrito em Go, otimizado para throughput
-- **Erasure Coding**: Proteção contra falhas de disco
-- **Multi-Tenancy**: Buckets isolados por ambiente
+- **Leader Election**: Para serviços singleton (jobs de cleanup, agregações)
+- **Feature Flags**: Controle de features em runtime sem redeploy
+- **Rate Limits Globais**: Configuração centralizada dinâmica
 
-**Por que é a melhor escolha:**
-
-- **Custo**: Zero custo de vendor lock-in
-- **Resumable Uploads**: Suporte nativo a multipart
-- **CDN Ready**: Integração fácil com CDNs
-- **Scalability**: Distributed mode com múltiplos nós
-
-#### 1.2.7 Por que etcd?
-
-**Vantagens:**
-
-- **Consensus Distribuído**: Raft algorithm para consistência
-- **Service Discovery**: Health checks e service registry
-- **Configuration Management**: Versionamento de configs
-- **Leader Election**: Para serviços singleton
-
-**Uso no Projeto:**
-
-- **Service Registry**: Discovery de serviços gRPC
-- **Feature Flags**: Controle de features em runtime
-- **Rate Limits Globais**: Configuração centralizada
-- **Sharding Configuration**: Mapeamento dinâmico de partições
+**Kubernetes Service Discovery**: Usar o nativo do K8s (CoreDNS) para comunicação entre microsserviços, eliminando redundância
 
 ### 1.3 Padrões Arquiteturais Aplicados
 
 #### 1.3.1 API Gateway Pattern
 
 - **Vantagem**: Ponto único de entrada, centraliza cross-cutting concerns
-- **Implementação**: Nginx como reverse proxy + PHP middleware para auth/rate limiting
+- **Implementação**: Kong/Tyk/KrakenD para auth/rate limiting de alta performance
 
-#### 1.3.2 Circuit Breaker Pattern
+#### 1.3.2 WebSocket Gateway Pattern
+
+- **Vantagem**: Desacopla comunicação real-time do gRPC
+- **Implementação**: Serviço dedicado (Swoole) que:
+  - Mantém conexões WebSocket ativas dos clientes
+  - Se inscreve em Redis Pub/Sub (presence:updates, user:*:messages)
+  - Encaminha mensagens para clientes corretos
+
+#### 1.3.3 Circuit Breaker Pattern
 
 - **Vantagem**: Previne cascata de falhas
 - **Implementação**: Biblioteca guzzle/circuit-breaker para connectors externos
 
-#### 1.3.3 Saga Pattern
+#### 1.3.4 Saga Pattern
 
 - **Vantagem**: Transações distribuídas sem 2PC
 - **Implementação**: Compensating transactions via Kafka events
 
-#### 1.3.4 CQRS (Command Query Responsibility Segregation)
+#### 1.3.5 CQRS (Command Query Responsibility Segregation)
 
 - **Vantagem**: Otimiza reads e writes separadamente
 - **Implementação**: Writes em MongoDB via Kafka, reads de cache Redis
-
-#### 1.3.5 Event Sourcing (Parcial)
-
-- **Vantagem**: Auditoria completa, replay de eventos
-- **Implementação**: Eventos de mensagem persistidos no Kafka
 
 ## 2. Modelagem de Dados
 
@@ -265,7 +246,7 @@ CREATE TABLE user_channels (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     channel_type VARCHAR(50) NOT NULL CHECK (channel_type IN ('whatsapp', 'instagram', 'telegram', 'messenger', 'internal')),
-    channel_user_id VARCHAR(255) NOT NULL, -- ID do usuário na plataforma externa
+    channel_user_id VARCHAR(255) NOT NULL,
     channel_metadata JSONB DEFAULT '{}'::jsonb,
     verified BOOLEAN DEFAULT false,
     created_at TIMESTAMP DEFAULT NOW(),
@@ -276,13 +257,19 @@ CREATE TABLE user_channels (
     INDEX idx_user_channels_external (channel_type, channel_user_id)
 );
 
--- Conversas (apenas metadata)
+-- Conversas (metadata + última mensagem desnormalizada)
 CREATE TABLE conversations (
     conversation_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     type VARCHAR(20) NOT NULL CHECK (type IN ('private', 'group')),
     created_by UUID NOT NULL REFERENCES users(user_id),
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW(),
+    
+    -- Desnormalização para listagem eficiente
+    last_message_id UUID,
+    last_message_at TIMESTAMP,
+    last_message_snippet TEXT,
+    
     metadata JSONB DEFAULT '{}'::jsonb,
     is_active BOOLEAN DEFAULT true,
     
@@ -310,8 +297,8 @@ CREATE TABLE webhooks (
     webhook_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     url VARCHAR(2048) NOT NULL,
-    events TEXT[] NOT NULL, -- Array de eventos: ['message.delivered', 'message.read']
-    secret VARCHAR(255) NOT NULL, -- Para HMAC verification
+    events TEXT[] NOT NULL,
+    secret VARCHAR(255) NOT NULL,
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP DEFAULT NOW(),
     
@@ -319,7 +306,7 @@ CREATE TABLE webhooks (
     INDEX idx_webhooks_active (is_active)
 );
 
--- Tokens de acesso (JWT metadata - opcional)
+-- Tokens de acesso
 CREATE TABLE access_tokens (
     token_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
@@ -332,11 +319,11 @@ CREATE TABLE access_tokens (
     INDEX idx_access_tokens_expires (expires_at)
 );
 
--- Configuração de canais (para connectors)
+-- Configuração de canais
 CREATE TABLE channel_configs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     channel_type VARCHAR(50) NOT NULL UNIQUE,
-    config JSONB NOT NULL, -- API keys, endpoints, etc.
+    config JSONB NOT NULL,
     is_enabled BOOLEAN DEFAULT true,
     updated_at TIMESTAMP DEFAULT NOW(),
     
@@ -344,55 +331,41 @@ CREATE TABLE channel_configs (
 );
 ```
 
-**Justificativa PostgreSQL Schema:**
-
-- **Normalização**: Reduz redundância, garante integridade referencial
-- **JSONB**: Flexibilidade para metadata sem sacrificar performance (índices GIN)
-- **UUIDs**: Distribuição de IDs sem coordenação central
-- **Constraints**: CHECK constraints validam dados no DB layer
-- **Indexes**: Otimizam queries frequentes (user lookup, conversation members)
-
 ### 2.2 MongoDB Collections (Messages & Time-Series Data)
 
 ```javascript
 // Collection: messages
-// Sharding Key: conversation_id (hash-based)
+// Sharding Key: { conversation_id: 1, created_at: 1 } (Compound key para evitar hot shards)
 {
-    _id: ObjectId(), // MongoDB native ID
-    message_id: UUID(), // UUID universal para idempotência
-    conversation_id: UUID(), // Foreign key para PostgreSQL
+    _id: ObjectId(),
+    message_id: UUID(),
+    conversation_id: UUID(),
     from_user_id: UUID(),
-    to_user_ids: [UUID()], // Array para suportar grupos
+    to_user_ids: [UUID()],
     
     // Payload
     payload: {
         type: "text|file|image|video|audio",
-        text: "Olá!", // Se type=text
-        file_reference: { // Se type=file
+        text: "Olá!",
+        file_reference: {
             file_id: UUID(),
             filename: "doc.pdf",
             size_bytes: 1024000,
             mime_type: "application/pdf",
             storage_url: "minio://bucket/path"
         },
-        metadata: {} // Dados customizados
+        metadata: {}
     },
     
     // Channels de entrega
-    target_channels: ["whatsapp", "instagram"], // ou ["all"]
+    target_channels: ["whatsapp", "instagram"],
     
     // Status tracking
-    status: "sent", // sent|delivered|read|failed
+    status: "sent",
     status_history: [
         {
             status: "sent",
             timestamp: ISODate("2025-01-15T10:00:00Z"),
-            details: {}
-        },
-        {
-            status: "delivered",
-            timestamp: ISODate("2025-01-15T10:00:05Z"),
-            channel: "whatsapp",
             details: {}
         }
     ],
@@ -403,66 +376,67 @@ CREATE TABLE channel_configs (
             status: "delivered",
             delivered_at: ISODate("2025-01-15T10:00:05Z"),
             external_message_id: "wa_msg_123"
-        },
-        instagram: {
-            status: "sent",
-            sent_at: ISODate("2025-01-15T10:00:01Z")
         }
     },
     
     // Metadata
-    sequence_number: 42, // Ordem dentro da conversa
-    reply_to_message_id: UUID(), // Se for reply
+    sequence_number: 42,
+    reply_to_message_id: UUID(),
     is_edited: false,
     is_deleted: false,
     
     // Timestamps
     created_at: ISODate("2025-01-15T10:00:00Z"),
     updated_at: ISODate("2025-01-15T10:00:05Z"),
-    ttl_expire_at: ISODate("2025-04-15T10:00:00Z") // TTL index
+    ttl_expire_at: ISODate("2025-04-15T10:00:00Z")
 }
 
 // Indexes
 db.messages.createIndex({ message_id: 1 }, { unique: true })
-db.messages.createIndex({ conversation_id: 1, sequence_number: 1 })
 db.messages.createIndex({ conversation_id: 1, created_at: -1 })
+db.messages.createIndex({ conversation_id: 1, sequence_number: 1 })
 db.messages.createIndex({ from_user_id: 1, created_at: -1 })
-db.messages.createIndex({ status: 1 })
-db.messages.createIndex({ ttl_expire_at: 1 }, { expireAfterSeconds: 0 }) // TTL
-```
+db.messages.createIndex({ ttl_expire_at: 1 }, { expireAfterSeconds: 0 })
 
-```javascript
-// Collection: conversation_history
-// Para queries de histórico otimizadas
+// ===================================================================
+// Collection: conversation_history (Time Series Collection - MongoDB 5.0+)
+// Substitui bucketing manual por coleção nativa otimizada
+// ===================================================================
+db.createCollection("conversation_history", {
+    timeseries: {
+        timeField: "timestamp",
+        metaField: "conversation_id",
+        granularity: "hours"
+    },
+    expireAfterSeconds: 7776000  // 90 dias
+})
+
+// Documento de exemplo
 {
-    _id: ObjectId(),
     conversation_id: UUID(),
-    date: ISODate("2025-01-15"), // Bucketing por dia
-    message_ids: [UUID()], // Array de message_ids do dia
-    message_count: 127,
-    last_message_at: ISODate("2025-01-15T23:59:00Z"),
-    
-    // Cache de última mensagem para listagem de conversas
-    last_message: {
-        message_id: UUID(),
-        text: "Última mensagem...",
-        from_user_id: UUID(),
-        created_at: ISODate("2025-01-15T23:59:00Z")
+    timestamp: ISODate("2025-01-15T10:00:00Z"),
+    message_id: UUID(),
+    message_text: "Última mensagem...",
+    from_user_id: UUID(),
+    metrics: {
+        message_length: 127,
+        has_attachment: false
     }
 }
 
-// Indexes
-db.conversation_history.createIndex({ conversation_id: 1, date: -1 })
+// Benefícios:
+// - Compressão superior (até 90%)
+// - Queries temporais otimizadas
+// - Agregações mais rápidas
 ```
 
 ```javascript
 // Collection: file_metadata
-// Para metadados de arquivos grandes
 {
     _id: ObjectId(),
     file_id: UUID(),
     original_filename: "presentation.pptx",
-    size_bytes: 1887436800, // ~1.8GB
+    size_bytes: 1887436800,
     mime_type: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     
     // Storage details
@@ -470,25 +444,23 @@ db.conversation_history.createIndex({ conversation_id: 1, date: -1 })
         provider: "minio",
         bucket: "chat4all-files",
         key: "2025/01/15/uuid-filename.pptx",
-        region: "us-east-1",
-        url: "https://minio.chat4all.com/chat4all-files/..."
+        url: "https://minio.chat4all.com/..."
     },
     
-    // Chunking info (para uploads resumable)
+    // Chunking info
     chunks: [
         {
             chunk_number: 1,
-            size_bytes: 104857600, // 100MB
+            size_bytes: 104857600,
             checksum: "sha256:abc123...",
             uploaded_at: ISODate("2025-01-15T10:00:00Z")
         }
-        // ... mais chunks
     ],
     total_chunks: 18,
     
     // Upload tracking
-    upload_status: "completed", // initiated|in_progress|completed|failed
-    upload_initiated_by: UUID(), // user_id
+    upload_status: "completed",
+    upload_initiated_by: UUID(),
     upload_initiated_at: ISODate("2025-01-15T09:55:00Z"),
     upload_completed_at: ISODate("2025-01-15T10:15:00Z"),
     
@@ -499,102 +471,59 @@ db.conversation_history.createIndex({ conversation_id: 1, date: -1 })
         key_id: "key_123"
     },
     
-    // Access control
-    access_policy: "private", // public|private|restricted
-    allowed_users: [UUID()],
-    
-    // Metadata
     created_at: ISODate("2025-01-15T09:55:00Z"),
-    updated_at: ISODate("2025-01-15T10:15:00Z"),
-    expires_at: ISODate("2025-04-15T10:15:00Z") // Opcional
+    expires_at: ISODate("2025-04-15T10:15:00Z")
 }
 
-// Indexes
 db.file_metadata.createIndex({ file_id: 1 }, { unique: true })
 db.file_metadata.createIndex({ upload_status: 1 })
-db.file_metadata.createIndex({ upload_initiated_by: 1 })
 ```
 
-**Justificativa MongoDB Schema:**
-
-- **Document Model**: Mensagens são naturalmente documentos (payload flexível)
-- **Embedding**: Status history embarcado evita joins
-- **Sharding**: Por conversation_id mantém mensagens da mesma conversa no mesmo shard
-- **Indexes**: Otimizados para queries temporais (created_at DESC)
-- **TTL**: Expira mensagens antigas automaticamente
-- **Bucketing**: conversation_history reduz scans para listagens
-
-### 2.3 Redis Data Structures
+### 2.3 Redis Data Structures (Simplificadas)
 
 ```redis
 # Session Storage (Hash)
 HSET session:{token_hash} user_id {uuid} expires_at {timestamp}
 EXPIRE session:{token_hash} 3600
 
-# User Presence (Sorted Set por timestamp)
-ZADD presence:online {current_timestamp} {user_id}
-# Remover usuários inativos (>5 min)
-ZREMRANGEBYSCORE presence:online 0 {timestamp_5min_ago}
+# User Presence (Hash com TTL - Simplificado!)
+HSET presence:user:{user_id} status online last_seen {timestamp}
+EXPIRE presence:user:{user_id} 300  # 5 minutos
+# Heartbeat do cliente renova o EXPIRE a cada 4 minutos
+# Verificar online: EXISTS presence:user:{user_id}
 
 # Message Deduplication (Set com TTL)
 SADD dedup:messages {message_id}
-EXPIRE dedup:messages 300 # 5 minutos
+EXPIRE dedup:messages 300
 
 # Rate Limiting (String com atomic increment)
 INCR rate_limit:{user_id}:{minute}
 EXPIRE rate_limit:{user_id}:{minute} 60
 
 # Conversation Cache (Hash)
-HSET conv:{conversation_id} type {type} members {json_array} updated_at {timestamp}
-EXPIRE conv:{conversation_id} 1800 # 30 min
+HSET conv:{conversation_id} type {type} members {json_array}
+EXPIRE conv:{conversation_id} 1800
 
-# User Channel Mapping (Hash)
-HSET user_channels:{user_id} whatsapp {phone} instagram {username}
-
-# Message Status Cache (para quick lookups)
-HSET msg_status:{message_id} status {status} updated_at {timestamp}
-EXPIRE msg_status:{message_id} 3600
-
-# Pub/Sub Channels
+# Pub/Sub Channels (para WebSocket Gateway)
 PUBLISH presence:updates {json_user_event}
-PUBLISH message:delivered {json_message_event}
+PUBLISH user:{user_id}:messages {json_message_event}
 ```
 
-**Justificativa Redis:**
-
-- **Performance**: Sub-milissegundo latency para presence checks
-- **Atomic Operations**: INCR para rate limiting sem race conditions
-- **TTL**: Cleanup automático de dados temporários
-- **Pub/Sub**: Real-time events sem overhead de Kafka para dados efêmeros
-
-### 2.4 etcd Key-Value Schema
+### 2.4 etcd Key-Value Schema (Uso Refinado)
 
 ```
-# Service Discovery
-/services/grpc/auth/node1 -> {"host": "10.0.1.10", "port": 50051, "health": "healthy"}
-/services/grpc/auth/node2 -> {"host": "10.0.1.11", "port": 50051, "health": "healthy"}
+# Leader Election (uso principal)
+/leaders/file_cleanup_job -> {"leader": "worker-node-3", "elected_at": "2025-01-15T10:00:00Z"}
 
-# Configuration
-/config/kafka/brokers -> ["kafka1:9092", "kafka2:9092", "kafka3:9092"]
-/config/rate_limits/global -> {"messages_per_minute": 1000, "files_per_hour": 100}
-
-# Feature Flags
+# Feature Flags (configuração dinâmica)
 /features/new_ui -> {"enabled": true, "rollout_percentage": 50}
 
-# Sharding Configuration
-/sharding/conversations/partitions -> 16
-/sharding/conversations/map/partition_0 -> ["node1", "node2"]
+# Rate Limits Globais (ajuste em runtime)
+/config/rate_limits/global -> {"messages_per_minute": 1000, "files_per_hour": 100}
 
-# Leader Election
-/leaders/file_cleanup_job -> {"leader": "worker-node-3", "elected_at": "2025-01-15T10:00:00Z"}
+# Nota: Service Discovery usa Kubernetes nativo (CoreDNS)
+# Exemplo: message-service.chat4all.svc.cluster.local
 ```
-
-**Justificativa etcd:**
-
-- **Consensus**: Garantias de consistência via Raft
-- **Watch API**: Serviços recebem config updates em real-time
-- **Lease TTL**: Health checks automáticos
-- **Atomic CAS**: Compare-and-swap para leader election
 
 ## 3. Esqueleto do Projeto
 
@@ -602,33 +531,30 @@ PUBLISH message:delivered {json_message_event}
 
 ```
 chat4all-v2/
-├── api-gateway/                    # API Gateway (Nginx + PHP middleware)
+├── api-gateway/                    # API Gateway (Kong/Tyk/KrakenD)
 │   ├── config/
-│   │   ├── nginx.conf
-│   │   └── php-fpm.conf
-│   ├── public/
-│   │   └── index.php             # Entry point
-│   ├── src/
-│   │   ├── Middleware/
-│   │   │   ├── AuthMiddleware.php
-│   │   │   ├── RateLimitMiddleware.php
-│   │   │   └── CorsMiddleware.php
-│   │   └── Router.php
+│   │   ├── kong.yml
+│   │   └── policies/
 │   └── Dockerfile
 │
-├── services/                       # Microserviços gRPC
+├── websocket-gateway/              # Gateway WebSocket dedicado
+│   ├── src/
+│   │   ├── server.php              # Swoole WebSocket Server
+│   │   ├── RedisSubscriber.php
+│   │   └── ConnectionManager.php
+│   ├── config/
+│   └── Dockerfile
+│
+├── services/                       # Microsserviços gRPC
 │   ├── auth-service/
 │   │   ├── proto/
 │   │   │   └── auth.proto
 │   │   ├── src/
 │   │   │   ├── Server.php
 │   │   │   ├── AuthServiceImpl.php
-│   │   │   ├── Repository/
-│   │   │   │   └── UserRepository.php
-│   │   │   └── Security/
-│   │   │       ├── JwtManager.php
-│   │   │       └── PasswordHasher.php
-│   │   ├── tests/
+│   │   │   └── Repository/
+│   │   │       └── UserRepository.php
+│   │   ├── .rr.yaml                # RoadRunner config
 │   │   ├── composer.json
 │   │   └── Dockerfile
 │   │
@@ -639,260 +565,101 @@ chat4all-v2/
 │   │   │   ├── Server.php
 │   │   │   ├── MessageServiceImpl.php
 │   │   │   ├── Repository/
-│   │   │   │   ├── MessageRepository.php (MongoDB)
-│   │   │   │   └── ConversationRepository.php (PostgreSQL)
-│   │   │   ├── EventPublisher/
-│   │   │   │   └── KafkaPublisher.php
-│   │   │   └── ValueObject/
-│   │   │       ├── MessageId.php
-│   │   │       └── ConversationId.php
-│   │   ├── tests/
+│   │   │   │   ├── MessageRepository.php
+│   │   │   │   └── ConversationRepository.php
+│   │   │   └── EventPublisher/
+│   │   │       └── KafkaPublisher.php
+│   │   ├── .rr.yaml
 │   │   ├── composer.json
 │   │   └── Dockerfile
 │   │
 │   ├── file-service/
-│   │   ├── proto/
-│   │   │   └── file.proto
-│   │   ├── src/
-│   │   │   ├── Server.php
-│   │   │   ├── FileServiceImpl.php
-│   │   │   ├── Storage/
-│   │   │   │   ├── MinioStorage.php
-│   │   │   │   └── ChunkManager.php
-│   │   │   └── Repository/
-│   │   │       └── FileMetadataRepository.php
-│   │   ├── tests/
-│   │   ├── composer.json
-│   │   └── Dockerfile
-│   │
 │   ├── conversation-service/
-│   │   └── ... (similar structure)
-│   │
 │   └── presence-service/
-│       └── ... (similar structure)
 │
 ├── workers/                        # Kafka Consumers
 │   ├── router-worker/
 │   │   ├── src/
 │   │   │   ├── Consumer.php
 │   │   │   ├── MessageRouter.php
-│   │   │   ├── ChannelResolver.php
 │   │   │   └── DeduplicationService.php
-│   │   ├── config/
-│   │   │   └── kafka.php
-│   │   ├── composer.json
+│   │   ├── .rr.yaml
 │   │   └── Dockerfile
 │   │
 │   ├── delivery-worker/
-│   │   ├── src/
-│   │   │   ├── Consumer.php
-│   │   │   ├── DeliveryHandler.php
-│   │   │   └── RetryStrategy.php
-│   │   ├── composer.json
-│   │   └── Dockerfile
-│   │
 │   └── status-worker/
-│       ├── src/
-│       │   ├── Consumer.php
-│       │   ├── StatusUpdater.php
-│       │   └── WebhookDispatcher.php
-│       ├── composer.json
-│       └── Dockerfile
+│       └── src/
+│           ├── StatusUpdater.php   # Atualiza last_message em PostgreSQL
+│           └── WebhookDispatcher.php
 │
 ├── connectors/                     # Channel Adapters (Plugin Architecture)
 │   ├── connector-interface/
 │   │   └── src/
-│   │       ├── ConnectorInterface.php
-│   │       ├── MessageDTO.php
-│   │       └── ConnectorException.php
+│   │       └── ConnectorInterface.php
 │   │
 │   ├── whatsapp-connector/
-│   │   ├── src/
-│   │   │   ├── WhatsAppConnector.php
-│   │   │   ├── WhatsAppClient.php
-│   │   │   └── WebhookHandler.php
-│   │   ├── tests/
-│   │   ├── composer.json
-│   │   └── Dockerfile
+│   │   └── composer.json           # Dependências próprias
 │   │
 │   ├── telegram-connector/
-│   │   ├── src/
-│   │   │   ├── TelegramConnector.php
-│   │   │   ├── TelegramBotClient.php
-│   │   │   └── WebhookHandler.php
-│   │   ├── composer.json
-│   │   └── Dockerfile
+│   │   └── composer.json
 │   │
-│   ├── instagram-connector/
-│   │   └── ... (similar structure)
-│   │
-│   └── mock-connector/             # Para testes
-│       └── src/
-│           └── MockConnector.php
+│   └── instagram-connector/
+│       └── composer.json
 │
-├── shared/                         # Código compartilhado
-│   ├── proto/                      # Protobuf definitions compartilhados
-│   │   ├── common.proto
-│   │   ├── events.proto
-│   │   └── Makefile               # Para gerar código
-│   │
-│   ├── src/
-│   │   ├── Database/
-│   │   │   ├── PostgresConnection.php
-│   │   │   ├── MongoConnection.php
-│   │   │   └── RedisConnection.php
-│   │   ├── Kafka/
-│   │   │   ├── KafkaProducer.php
-│   │   │   ├── KafkaConsumer.php
-│   │   │   └── TopicRegistry.php
-│   │   ├── Etcd/
-│   │   │   ├── EtcdClient.php
-│   │   │   └── ServiceDiscovery.php
-│   │   ├── Logging/
-│   │   │   ├── Logger.php
-│   │   │   └── TraceContext.php
-│   │   ├── Metrics/
-│   │   │   ├── PrometheusExporter.php
-│   │   │   └── MetricsCollector.php
-│   │   ├── Security/
-│   │   │   ├── Encryption.php
-│   │   │   └── SignatureVerifier.php
-│   │   └── ValueObjects/
-│   │       ├── UUID.php
-│   │       ├── Timestamp.php
-│   │       └── MessageStatus.php
-│   │
-│   └── composer.json
+├── packages/                       # Pacotes versionados (substitui shared/)
+│   └── common-contracts/
+│       ├── src/
+│       │   └── ValueObjects/
+│       │       ├── UUID.php
+│       │       └── MessageStatus.php
+│       └── composer.json           # Versionado (ex: 1.2.0)
 │
 ├── frontend/                       # Interface Web
-│   ├── angular/                    # AngularJS application
+│   ├── angular-app/                # Angular 17+
 │   │   ├── src/
 │   │   │   ├── app/
 │   │   │   │   ├── auth/
-│   │   │   │   │   ├── login.component.ts
-│   │   │   │   │   └── auth.service.ts
 │   │   │   │   ├── chat/
-│   │   │   │   │   ├── conversation-list.component.ts
-│   │   │   │   │   ├── message-list.component.ts
-│   │   │   │   │   └── message-input.component.ts
-│   │   │   │   ├── services/
-│   │   │   │   │   ├── api.service.ts
-│   │   │   │   │   ├── websocket.service.ts
-│   │   │   │   │   └── file-upload.service.ts
-│   │   │   │   └── app.module.ts
-│   │   │   ├── assets/
+│   │   │   │   └── services/
+│   │   │   │       └── websocket.service.ts
 │   │   │   └── index.html
 │   │   ├── package.json
-│   │   ├── angular.json
 │   │   └── Dockerfile
 │   │
-│   └── nginx/                      # Nginx para servir frontend
-│       ├── nginx.conf
-│       └── Dockerfile
+│   └── nginx/
+│       └── nginx.conf
 │
-├── infrastructure/                 # Configuração de infraestrutura
+├── infrastructure/
 │   ├── kubernetes/
 │   │   ├── namespaces/
-│   │   │   └── chat4all.yaml
 │   │   ├── databases/
-│   │   │   ├── postgresql-statefulset.yaml
-│   │   │   ├── mongodb-statefulset.yaml
-│   │   │   ├── redis-statefulset.yaml
-│   │   │   └── etcd-statefulset.yaml
 │   │   ├── messaging/
-│   │   │   └── kafka-cluster.yaml
-│   │   ├── storage/
-│   │   │   └── minio-statefulset.yaml
 │   │   ├── services/
-│   │   │   ├── auth-service-deployment.yaml
-│   │   │   ├── message-service-deployment.yaml
-│   │   │   ├── file-service-deployment.yaml
-│   │   │   └── ...
-│   │   ├── workers/
-│   │   │   ├── router-worker-deployment.yaml
-│   │   │   └── ...
-│   │   ├── connectors/
-│   │   │   ├── telegram-connector-deployment.yaml
-│   │   │   └── ...
 │   │   ├── monitoring/
-│   │   │   ├── prometheus-deployment.yaml
-│   │   │   ├── grafana-deployment.yaml
-│   │   │   └── jaeger-deployment.yaml
-│   │   ├── ingress/
-│   │   │   └── ingress.yaml
 │   │   └── configmaps/
-│   │       ├── kafka-config.yaml
-│   │       └── app-config.yaml
+│   │       └── hierarchy-config.yaml  # Hierarquia de configuração
 │   │
-│   ├── docker-compose/             # Para desenvolvimento local
-│   │   ├── docker-compose.yml
-│   │   ├── docker-compose.dev.yml
-│   │   └── .env.example
-│   │
-│   └── terraform/                  # IaC para cloud (opcional)
-│       ├── aws/
-│       └── gcp/
+│   └── docker-compose/
+│       ├── docker-compose.yml
+│       └── .env.example
 │
-├── scripts/                        # Scripts úteis
-│   ├── generate-proto.sh           # Gera código a partir de .proto
-│   ├── init-databases.sh           # Inicializa schemas
-│   ├── seed-data.sh                # Dados de teste
-│   ├── run-tests.sh                # Executa todos os testes
-│   └── deploy.sh                   # Deploy automatizado
+├── scripts/
+│   ├── generate-proto.sh
+│   └── init-databases.sh
 │
-├── tests/                          # Testes integrados
-│   ├── integration/
-│   │   ├── MessageFlowTest.php
-│   │   ├── FileUploadTest.php
-│   │   └── CrossChannelTest.php
-│   ├── load/
-│   │   ├── k6-scenarios/
-│   │   │   ├── message-load.js
-│   │   │   └── file-upload-load.js
-│   │   └── gatling/
-│   └── e2e/
-│       └── cypress/
-│
-├── docs/                           # Documentação
+├── docs/
 │   ├── architecture/
 │   │   ├── system-design.md
-│   │   ├── data-flow.md
-│   │   └── diagrams/
-│   ├── api/
-│   │   ├── openapi.yaml           # Spec OpenAPI 3.0
-│   │   └── grpc-docs.md
-│   ├── deployment/
-│   │   ├── kubernetes-guide.md
-│   │   └── scaling-guide.md
-│   └── development/
-│       ├── setup-guide.md
-│       ├── coding-standards.md
-│       └── testing-guide.md
+│   │   ├── websocket-flow.md
+│   │   └── configuration-hierarchy.md
+│   └── api/
 │
-├── monitoring/                     # Configurações de monitoramento
+├── monitoring/
 │   ├── prometheus/
-│   │   ├── prometheus.yml
-│   │   └── alerts.yml
 │   ├── grafana/
-│   │   └── dashboards/
-│   │       ├── system-overview.json
-│   │       ├── message-metrics.json
-│   │       └── connector-health.json
 │   └── jaeger/
-│       └── jaeger-config.yaml
 │
-├── .github/                        # CI/CD
-│   └── workflows/
-│       ├── ci.yml
-│       ├── deploy-staging.yml
-│       └── deploy-production.yml
-│
-├── composer.json                   # Root composer (para shared)
-├── .gitignore
-├── .editorconfig
-├── README.md
-├── CONTRIBUTING.md
-└── LICENSE
+└── README.md
 ```
 
 ### 3.2 Tecnologias e Dependências Principais
@@ -903,96 +670,14 @@ chat4all-v2/
 // services/message-service/composer.json
 {
     "name": "chat4all/message-service",
-    "description": "Message Service - gRPC Server",
     "type": "project",
     "require": {
         "php": "^8.4",
+        "spiral/roadrunner-grpc": "^3.0",
         "grpc/grpc": "^1.57",
         "google/protobuf": "^3.25",
         "mongodb/mongodb": "^1.17",
         "rdkafka/rdkafka": "^6.0",
         "predis/predis": "^2.2",
         "monolog/monolog": "^3.5",
-        "ramsey/uuid": "^4.7",
-        "symfony/console": "^7.0",
-        "php-etcd/client": "^2.0",
-        "open-telemetry/sdk": "^1.0",
-        "guzzlehttp/guzzle": "^7.8"
-    },
-    "require-dev": {
-        "phpunit/phpunit": "^10.5",
-        "phpstan/phpstan": "^1.10",
-        "squizlabs/php_codesniffer": "^3.8",
-        "mockery/mockery": "^1.6"
-    },
-    "autoload": {
-        "psr-4": {
-            "Chat4All\\MessageService\\": "src/"
-        }
-    }
-}
-```
-
-**Justificativa das Bibliotecas:**
-
-1. **grpc/grpc**: Extensão oficial PHP para gRPC
-    - Performance nativa (C extension)
-    - Suporte completo a streaming bidirecional
-2. **mongodb/mongodb**: Driver oficial MongoDB
-    - Connection pooling automático
-    - Query builder fluente
-    - Suporte a transações multi-document
-3. **rdkafka/rdkafka**: Cliente Kafka de alta performance
-    - Baseado em librdkafka (C)
-    - 10x mais rápido que clientes PHP puros
-    - Suporte a exactly-once semantics
-4. **predis/predis**: Cliente Redis puro PHP
-    - Não requer extensão C
-    - Suporte a clustering e sentinel
-    - Pipeline e transações
-5. **open-telemetry/sdk**: Observabilidade distribuída
-    - Tracing padronizado
-    - Integração com Jaeger/Zipkin
-    - Métricas e logs correlacionados
-
-#### 3.2.2 Frontend Dependencies (Angular)
-
-```json
-// frontend/angular/package.json
-{
-    "name": "chat4all-frontend",
-    "version": "2.0.0",
-    "scripts": {
-        "start": "ng serve",
-        "build": "ng build --prod",
-        "test": "ng test"
-    },
-    "dependencies": {
-        "@angular/core": "^17.0.0",
-        "@angular/common": "^17.0.0",
-        "@angular/router": "^17.0.0",
-        "@angular/forms": "^17.0.0",
-        "@angular/material": "^17.0.0",
-        "rxjs": "^7.8.0",
-        "socket.io-client": "^4.6.0",
-        "@grpc/grpc-js": "^1.9.0",
-        "@grpc/proto-loader": "^0.7.10",
-        "ngx-file-drop": "^16.0.0",
-        "emoji-mart": "^5.5.0"
-    }
-}
-```
-
-**Nota sobre Frontend:** Embora o enunciado mencione AngularJS, **recomendo fortemente usar Angular moderno (v17+)** ao invés de AngularJS (1.x), pois:
-
-- AngularJS está deprecado desde 2022
-- Angular moderno oferece melhor performance (Ivy compiler)
-- TypeScript nativo com type safety
-- Reactive programming com RxJS
-- Component-based architecture alinhada com microserviços
-
-**Alternativas ao Angular:**
-
-1. **React** + TypeScript: Mais leve, maior comunidade
-2. **Vue 3**: Curva de aprendizado mais suave
-3. **Svelte**: Performance excepcional, bundle menor
+        "ramsey/uuid": "
