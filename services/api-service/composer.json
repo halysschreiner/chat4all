@@ -1,0 +1,24 @@
+{
+    "name": "chat4all/api-service",
+    "description": "API Service para Chat4All - Sistema de Mensagens Distribuído",
+    "type": "project",
+    "require": {
+        "php": "^8.1",
+        "slim/slim": "^4.12",
+        "slim/psr7": "^1.6",
+        "firebase/php-jwt": "^6.10",
+        "predis/predis": "^2.2",
+        "monolog/monolog": "^3.5",
+        "ext-rdkafka": "*",
+        "ext-pdo": "*",
+        "ext-pdo_pgsql": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "Chat4All\\Api\\": "src/"
+        }
+    },
+    "config": {
+        "optimize-autoloader": true
+    }
+}

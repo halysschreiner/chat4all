@@ -1,0 +1,20 @@
+{
+    "name": "chat4all/router-worker",
+    "description": "Router Worker para Chat4All - Consome mensagens do Kafka",
+    "type": "project",
+    "require": {
+        "php": "^8.1",
+        "monolog/monolog": "^3.5",
+        "ext-rdkafka": "*",
+        "ext-pdo": "*",
+        "ext-pdo_pgsql": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "Chat4All\\Worker\\": "src/"
+        }
+    },
+    "config": {
+        "optimize-autoloader": true
+    }
+}
