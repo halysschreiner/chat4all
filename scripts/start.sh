@@ -51,7 +51,7 @@ docker-compose exec -T redis redis-cli ping
 
 echo ""
 echo "🚀 Iniciando serviços da aplicação..."
-docker-compose up -d api-service router-worker
+docker-compose up -d api-service router-worker web
 
 echo ""
 echo "⏳ Aguardando serviços ficarem prontos..."
@@ -64,6 +64,7 @@ echo "================================================"
 echo ""
 echo "📋 Serviços disponíveis:"
 echo ""
+echo "  🌐 Interface Web:     http://localhost:9000"
 echo "  🌐 API Service:       http://localhost:8080"
 echo "  🗄️  PostgreSQL:        localhost:5432"
 echo "  📦 Redis:             localhost:6379"
