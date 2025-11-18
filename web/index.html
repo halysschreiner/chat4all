@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat4All - Sistema de Mensagens</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 900px;
+            height: 85vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Login Screen */
+        .login-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            height: 100%;
+        }
+
+        .login-screen h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+
+        .login-screen p {
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .login-form {
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .error-message {
+            background: #fee;
+            color: #c33;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        /* Chat Screen */
+        .chat-screen {
+            display: none;
+            height: 100%;
+            flex-direction: column;
+        }
+
+        .chat-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-header h2 {
+            font-size: 1.2em;
+        }
+
+        .chat-header .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .chat-header button {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .chat-header button:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        .message {
+            display: flex;
+            margin-bottom: 16px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.own {
+            flex-direction: row-reverse;
+        }
+
+        .message-content {
+            max-width: 60%;
+            padding: 12px 16px;
+            border-radius: 16px;
+            position: relative;
+        }
+
+        .message.own .message-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .message.other .message-content {
+            background: white;
+            color: #333;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .message-meta {
+            font-size: 11px;
+            opacity: 0.7;
+            margin-top: 4px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .message-status {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .message.other .message-status {
+            background: rgba(0, 0, 0, 0.1);
+        }
+
+        .input-container {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 12px;
+        }
+
+        .input-container input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 24px;
+            font-size: 15px;
+            transition: border-color 0.3s;
+        }
+
+        .input-container input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .input-container button {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 24px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .input-container button:hover {
+            transform: scale(1.05);
+        }
+
+        .input-container button:active {
+            transform: scale(0.95);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #999;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #4caf50;
+            display: inline-block;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Tela de Login -->
+        <div class="login-screen" id="loginScreen">
+            <h1>💬 Chat4All</h1>
+            <p>Sistema de Mensagens Distribuído</p>
+            
+            <div class="login-form">
+                <div class="error-message" id="errorMessage"></div>
+                
+                <div class="form-group">
+                    <label for="userSelect">Selecione o Usuário</label>
+                    <select id="userSelect">
+                        <option value="alice@chat4all.com">Alice</option>
+                        <option value="bob@chat4all.com">Bob</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Senha</label>
+                    <input type="password" id="password" placeholder="Digite a senha" value="password123">
+                </div>
+                
+                <button class="btn" onclick="login()">Entrar no Chat</button>
+            </div>
+        </div>
+
+        <!-- Tela de Chat -->
+        <div class="chat-screen" id="chatScreen">
+            <div class="chat-header">
+                <div>
+                    <h2 id="conversationTitle">💬 Conversa</h2>
+                    <small id="conversationWith"></small>
+                </div>
+                <div class="user-info">
+                    <span class="status-indicator"></span>
+                    <span id="currentUser"></span>
+                    <button onclick="logout()">Sair</button>
+                </div>
+            </div>
+
+            <div class="messages-container" id="messagesContainer">
+                <div class="loading">Carregando mensagens...</div>
+            </div>
+
+            <div class="input-container">
+                <input 
+                    type="text" 
+                    id="messageInput" 
+                    placeholder="Digite sua mensagem..." 
+                    onkeypress="handleKeyPress(event)"
+                >
+                <button onclick="sendMessage()">Enviar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuração da API
+        const API_URL = 'http://localhost:8080';
+        const CONVERSATION_ID = '33333333-3333-3333-3333-333333333333';
+        
+        // Estado da aplicação
+        let authToken = null;
+        let currentUserId = null;
+        let currentUsername = null;
+        let pollInterval = null;
+
+        // Login do usuário
+        async function login() {
+            const email = document.getElementById('userSelect').value;
+            const password = document.getElementById('password').value;
+            const errorDiv = document.getElementById('errorMessage');
+
+            errorDiv.style.display = 'none';
+
+            try {
+                const response = await fetch(`${API_URL}/v1/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    authToken = data.token;
+                    currentUserId = data.user.user_id;
+                    currentUsername = data.user.username;
+
+                    // Atualizar UI
+                    document.getElementById('currentUser').textContent = currentUsername;
+                    const otherUser = currentUsername === 'alice' ? 'Bob' : 'Alice';
+                    document.getElementById('conversationWith').textContent = `Conversando com ${otherUser}`;
+
+                    // Trocar telas
+                    document.getElementById('loginScreen').style.display = 'none';
+                    document.getElementById('chatScreen').style.display = 'flex';
+
+                    // Carregar mensagens
+                    await loadMessages();
+
+                    // Iniciar polling (atualizar a cada 3 segundos)
+                    pollInterval = setInterval(loadMessages, 3000);
+                } else {
+                    errorDiv.textContent = data.error || 'Erro ao fazer login';
+                    errorDiv.style.display = 'block';
+                }
+            } catch (error) {
+                errorDiv.textContent = 'Erro ao conectar com o servidor';
+                errorDiv.style.display = 'block';
+                console.error('Erro:', error);
+            }
+        }
+
+        // Logout
+        function logout() {
+            clearInterval(pollInterval);
+            authToken = null;
+            currentUserId = null;
+            currentUsername = null;
+            
+            document.getElementById('loginScreen').style.display = 'flex';
+            document.getElementById('chatScreen').style.display = 'none';
+            document.getElementById('messagesContainer').innerHTML = '<div class="loading">Carregando mensagens...</div>';
+        }
+
+        // Carregar mensagens
+        async function loadMessages() {
+            if (!authToken) return;
+
+            try {
+                const response = await fetch(
+                    `${API_URL}/v1/conversations/${CONVERSATION_ID}/messages?limit=50`,
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${authToken}`
+                        }
+                    }
+                );
+
+                const data = await response.json();
+
+                if (data.success) {
+                    displayMessages(data.messages);
+                }
+            } catch (error) {
+                console.error('Erro ao carregar mensagens:', error);
+            }
+        }
+
+        // Exibir mensagens
+        function displayMessages(messages) {
+            const container = document.getElementById('messagesContainer');
+            const wasAtBottom = container.scrollHeight - container.scrollTop === container.clientHeight;
+
+            container.innerHTML = '';
+
+            if (messages.length === 0) {
+                container.innerHTML = '<div class="loading">Nenhuma mensagem ainda. Envie a primeira!</div>';
+                return;
+            }
+
+            messages.forEach(msg => {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message ' + (msg.from_user_id === currentUserId ? 'own' : 'other');
+
+                const statusText = {
+                    'SENT': 'Enviado',
+                    'DELIVERED': 'Entregue',
+                    'READ': 'Lido',
+                    'FAILED': 'Falhou'
+                }[msg.status] || msg.status;
+
+                const date = new Date(msg.created_at);
+                const timeStr = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+                messageDiv.innerHTML = `
+                    <div class="message-content">
+                        <div>${escapeHtml(msg.content)}</div>
+                        <div class="message-meta">
+                            <span>${timeStr}</span>
+                            <span class="message-status">${statusText}</span>
+                        </div>
+                    </div>
+                `;
+
+                container.appendChild(messageDiv);
+            });
+
+            // Auto-scroll se estava no final
+            if (wasAtBottom || messages.length === 1) {
+                container.scrollTop = container.scrollHeight;
+            }
+        }
+
+        // Enviar mensagem
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const content = input.value.trim();
+
+            if (!content || !authToken) return;
+
+            try {
+                const response = await fetch(`${API_URL}/v1/messages`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({
+                        conversation_id: CONVERSATION_ID,
+                        content: content
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    input.value = '';
+                    await loadMessages();
+                } else {
+                    alert('Erro ao enviar mensagem: ' + (data.error || 'Erro desconhecido'));
+                }
+            } catch (error) {
+                alert('Erro ao conectar com o servidor');
+                console.error('Erro:', error);
+            }
+        }
+
+        // Handle Enter key
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        // Escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Health check ao carregar
+        window.addEventListener('load', async () => {
+            try {
+                const response = await fetch(`${API_URL}/health`);
+                const data = await response.json();
+                console.log('API Status:', data);
+            } catch (error) {
+                console.error('API não está acessível:', error);
+            }
+        });
+    </script>
+</body>
+</html>
