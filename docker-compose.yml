@@ -1,140 +1,141 @@
-version: '3.8'
-
 services:
-  # Base de dados PostgreSQL
+  # PostgreSQL - Banco de dados relacional
   postgres:
-    image: postgres:16
-    container_name: chat4all_postgres
+    image: postgres:16-alpine
+    container_name: chat4all-postgres
     environment:
       POSTGRES_DB: chat4all
-      POSTGRES_USER: chat4all
-      POSTGRES_PASSWORD: chat4all123
+      POSTGRES_USER: chat4all_user
+      POSTGRES_PASSWORD: chat4all_pass
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     networks:
-      - chat4all_network
+      - chat4all-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chat4all_user -d chat4all"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # Cache Redis
+  # Redis - Cache e sessões
   redis:
     image: redis:7-alpine
-    container_name: chat4all_redis
+    container_name: chat4all-redis
     ports:
       - "6379:6379"
+    volumes:
+      - redis_data:/data
     networks:
-      - chat4all_network
+      - chat4all-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # Serviço de Autenticação (gRPC)
-  auth-service:
-    build:
-      context: ./services/auth-service
-      dockerfile: Dockerfile
-    container_name: chat4all_auth_service
+  # Zookeeper - Coordenação do Kafka
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: chat4all-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - chat4all-network
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Kafka - Message Broker
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: chat4all-kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,INTERNAL://kafka:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    networks:
+      - chat4all-network
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # API Service - Slim Framework
+  api-service:
+    build: ./services/api-service
+    container_name: chat4all-api
+    ports:
+      - "8080:8080"
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: chat4all
-      DB_USER: chat4all
-      DB_PASSWORD: chat4all123
+      DB_USER: chat4all_user
+      DB_PASSWORD: chat4all_pass
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      GRPC_PORT: 50051
-    ports:
-      - "50051:50051"
+      KAFKA_BROKERS: kafka:9093
+      JWT_SECRET: your-secret-key-change-in-production
+      JWT_EXPIRATION: 3600
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
     networks:
-      - chat4all_network
+      - chat4all-network
 
-  # Serviço de Mensagens (gRPC)
-  message-service:
-    build:
-      context: ./services/message-service
-      dockerfile: Dockerfile
-    container_name: chat4all_message_service
+  # Router Worker - Processa mensagens do Kafka
+  router-worker:
+    build: ./workers/router-worker
+    container_name: chat4all-router-worker
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: chat4all
-      DB_USER: chat4all
-      DB_PASSWORD: chat4all123
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      GRPC_PORT: 50052
-    ports:
-      - "50052:50052"
+      DB_USER: chat4all_user
+      DB_PASSWORD: chat4all_pass
+      KAFKA_BROKERS: kafka:9093
+      KAFKA_GROUP_ID: router-worker-group
+      KAFKA_TOPIC: messages
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
     networks:
-      - chat4all_network
+      - chat4all-network
 
-  # Serviço de Conversas (gRPC)
-  conversation-service:
-    build:
-      context: ./services/conversation-service
-      dockerfile: Dockerfile
-    container_name: chat4all_conversation_service
-    environment:
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: chat4all
-      DB_USER: chat4all
-      DB_PASSWORD: chat4all123
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      GRPC_PORT: 50053
+  # Web Interface - Interface de usuário
+  web:
+    build: ./web
+    container_name: chat4all-web
     ports:
-      - "50053:50053"
-    depends_on:
-      - postgres
-      - redis
+      - "9000:80"
     networks:
-      - chat4all_network
-
-  # API Gateway (REST -> gRPC)
-  api-gateway:
-    build:
-      context: ./api-gateway
-      dockerfile: Dockerfile
-    container_name: chat4all_api_gateway
-    environment:
-      AUTH_SERVICE_HOST: auth-service
-      AUTH_SERVICE_PORT: 50051
-      MESSAGE_SERVICE_HOST: message-service
-      MESSAGE_SERVICE_PORT: 50052
-      CONVERSATION_SERVICE_HOST: conversation-service
-      CONVERSATION_SERVICE_PORT: 50053
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-    ports:
-      - "8080:80"
-    depends_on:
-      - auth-service
-      - message-service
-      - conversation-service
-    networks:
-      - chat4all_network
-
-  # Frontend Angular
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: chat4all_frontend
-    ports:
-      - "4200:80"
-    depends_on:
-      - api-gateway
-    networks:
-      - chat4all_network
+      - chat4all-network
 
 networks:
-  chat4all_network:
+  chat4all-network:
     driver: bridge
 
 volumes:
   postgres_data:
+  redis_data:

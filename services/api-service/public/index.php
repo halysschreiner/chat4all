@@ -39,6 +39,24 @@ $logger->pushHandler(new StreamHandler('php://stdout', Logger::INFO));
 // Criar aplicação Slim
 $app = AppFactory::create();
 
+// ============================================
+// Middleware CORS - Permitir acesso da interface web
+// ============================================
+$app->add(function ($request, $handler) {
+    $response = $handler->handle($request);
+    
+    return $response
+        ->withHeader('Access-Control-Allow-Origin', '*')
+        ->withHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
+        ->withHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+        ->withHeader('Access-Control-Max-Age', '3600');
+});
+
+// Adicionar rota OPTIONS para preflight CORS
+$app->options('/{routes:.+}', function ($request, $response) {
+    return $response;
+});
+
 // Adicionar middleware de parsing de JSON
 $app->addBodyParsingMiddleware();
 
