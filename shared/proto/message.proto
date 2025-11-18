@@ -1,0 +1,93 @@
+syntax = "proto3";
+
+package message;
+
+// Serviço de Mensagens
+service MessageService {
+  // Enviar mensagem
+  rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);
+  
+  // Listar mensagens de uma conversa
+  rpc ListMessages(ListMessagesRequest) returns (ListMessagesResponse);
+  
+  // Marcar mensagem como lida
+  rpc MarkAsRead(MarkAsReadRequest) returns (MarkAsReadResponse);
+  
+  // Atualizar status da mensagem
+  rpc UpdateMessageStatus(UpdateMessageStatusRequest) returns (UpdateMessageStatusResponse);
+}
+
+// ===== Enviar Mensagem =====
+
+message SendMessageRequest {
+  string conversation_id = 1;
+  string from_user_id = 2;
+  string message_type = 3; // "text", "file", "image"
+  string content = 4; // Texto da mensagem ou URL do arquivo
+}
+
+message SendMessageResponse {
+  bool success = 1;
+  string message = 2;
+  Message sent_message = 3;
+}
+
+// ===== Listar Mensagens =====
+
+message ListMessagesRequest {
+  string conversation_id = 1;
+  string user_id = 2; // Para verificar permissão
+  int32 limit = 3; // Quantidade de mensagens
+  int32 offset = 4; // Paginação
+}
+
+message ListMessagesResponse {
+  bool success = 1;
+  repeated Message messages = 2;
+  int32 total_count = 3;
+}
+
+// ===== Marcar como Lida =====
+
+message MarkAsReadRequest {
+  string message_id = 1;
+  string user_id = 2;
+}
+
+message MarkAsReadResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// ===== Atualizar Status =====
+
+message UpdateMessageStatusRequest {
+  string message_id = 1;
+  string status = 2; // "sent", "delivered", "read"
+}
+
+message UpdateMessageStatusResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// ===== Tipos de Dados =====
+
+message Message {
+  string message_id = 1;
+  string conversation_id = 2;
+  string from_user_id = 3;
+  string from_username = 4; // Desnormalizado para facilitar exibição
+  string message_type = 5;
+  string content = 6;
+  string status = 7; // "sent", "delivered", "read"
+  string created_at = 8;
+  int32 sequence_number = 9;
+  repeated ReadStatus read_by = 10; // Quem leu a mensagem
+}
+
+message ReadStatus {
+  string user_id = 1;
+  string username = 2;
+  string read_at = 3;
+}

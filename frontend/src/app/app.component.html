@@ -1,0 +1,211 @@
+<!-- Chat4All Frontend Básico -->
+
+<div class="container">
+  <!-- VIEW: LOGIN -->
+  <div *ngIf="currentView === 'login' && !isAuthenticated" class="auth-container">
+    <div class="auth-box">
+      <h1>🗨️ Chat4All</h1>
+      <h2>Login</h2>
+      
+      <input 
+        type="email" 
+        [(ngModel)]="loginEmail" 
+        placeholder="Email"
+        class="input-field"
+      />
+      
+      <input 
+        type="password" 
+        [(ngModel)]="loginPassword" 
+        placeholder="Senha"
+        class="input-field"
+        (keyup.enter)="login()"
+      />
+      
+      <button (click)="login()" class="btn btn-primary">
+        Entrar
+      </button>
+      
+      <p class="link-text">
+        Não tem conta? 
+        <a (click)="currentView = 'register'">Registre-se</a>
+      </p>
+    </div>
+  </div>
+
+  <!-- VIEW: REGISTER -->
+  <div *ngIf="currentView === 'register' && !isAuthenticated" class="auth-container">
+    <div class="auth-box">
+      <h1>🗨️ Chat4All</h1>
+      <h2>Registrar</h2>
+      
+      <input 
+        type="text" 
+        [(ngModel)]="registerUsername" 
+        placeholder="Nome de usuário"
+        class="input-field"
+      />
+      
+      <input 
+        type="email" 
+        [(ngModel)]="registerEmail" 
+        placeholder="Email"
+        class="input-field"
+      />
+      
+      <input 
+        type="password" 
+        [(ngModel)]="registerPassword" 
+        placeholder="Senha"
+        class="input-field"
+      />
+      
+      <button (click)="register()" class="btn btn-primary">
+        Registrar
+      </button>
+      
+      <p class="link-text">
+        Já tem conta? 
+        <a (click)="currentView = 'login'">Faça login</a>
+      </p>
+    </div>
+  </div>
+
+  <!-- VIEW: CHAT -->
+  <div *ngIf="currentView === 'chat' && isAuthenticated" class="chat-container">
+    <!-- Sidebar com conversas -->
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <h3>Chat4All</h3>
+        <button (click)="logout()" class="btn btn-small">Sair</button>
+      </div>
+
+      <div class="user-info">
+        <strong>{{ currentUser.username }}</strong>
+        <small>{{ currentUser.email }}</small>
+      </div>
+
+      <button (click)="showCreateConversation = !showCreateConversation" class="btn btn-primary" style="width: 100%; margin-bottom: 10px;">
+        {{ showCreateConversation ? 'Cancelar' : '+ Nova Conversa' }}
+      </button>
+
+      <!-- Formulário para criar conversa -->
+      <div *ngIf="showCreateConversation" class="create-conversation-form">
+        <h4>Conversa Privada</h4>
+        <input 
+          type="text" 
+          [(ngModel)]="otherUserId" 
+          placeholder="ID do outro usuário"
+          class="input-field-small"
+        />
+        <button (click)="createPrivateConversation()" class="btn btn-small">Criar</button>
+
+        <h4 style="margin-top: 15px;">Ou Grupo</h4>
+        <input 
+          type="text" 
+          [(ngModel)]="groupName" 
+          placeholder="Nome do grupo"
+          class="input-field-small"
+        />
+        <input 
+          type="text" 
+          [(ngModel)]="groupMembers" 
+          placeholder="IDs dos membros (separados por vírgula)"
+          class="input-field-small"
+        />
+        <button (click)="createGroup()" class="btn btn-small">Criar Grupo</button>
+      </div>
+
+      <!-- Lista de conversas -->
+      <div class="conversations-list">
+        <div 
+          *ngFor="let conv of conversations" 
+          class="conversation-item"
+          [class.active]="selectedConversation?.conversation_id === conv.conversation_id"
+          (click)="selectConversation(conv)"
+        >
+          <div class="conversation-info">
+            <strong>
+              {{ conv.type === 'group' ? '👥 ' + conv.name : '👤 ' + (conv.members[0]?.username || 'Chat') }}
+            </strong>
+            <p class="last-message">{{ conv.last_message || 'Sem mensagens' }}</p>
+          </div>
+          <div class="conversation-meta">
+            <span *ngIf="conv.unread_count > 0" class="unread-badge">{{ conv.unread_count }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Área de mensagens -->
+    <div class="messages-area">
+      <div *ngIf="!selectedConversation" class="no-conversation">
+        <h2>👋 Bem-vindo ao Chat4All!</h2>
+        <p>Selecione uma conversa ou crie uma nova para começar.</p>
+      </div>
+
+      <div *ngIf="selectedConversation" class="messages-container">
+        <!-- Header da conversa -->
+        <div class="messages-header">
+          <h3>
+            {{ selectedConversation.type === 'group' ? selectedConversation.name : selectedConversation.members[0]?.username }}
+          </h3>
+          <small>
+            {{ selectedConversation.members.length }} membro(s)
+          </small>
+        </div>
+
+        <!-- Lista de mensagens -->
+        <div class="messages-list">
+          <div 
+            *ngFor="let message of messages" 
+            class="message"
+            [class.own-message]="message.from_user_id === currentUser.user_id"
+          >
+            <div class="message-content">
+              <div class="message-header">
+                <strong>{{ message.from_username }}</strong>
+                <small>{{ message.created_at | date:'short' }}</small>
+              </div>
+              <p>{{ message.content }}</p>
+              <div class="message-footer">
+                <span 
+                  class="status-badge" 
+                  [style.color]="getStatusColor(message.status)"
+                >
+                  {{ getStatusBadge(message.status) }}
+                </span>
+                
+                <!-- Mostrar quem leu -->
+                <span *ngIf="message.read_by && message.read_by.length > 0" class="read-by">
+                  Lida por: {{ getReadByNames(message.read_by) }}
+                </span>
+
+                <!-- Botão para marcar como lida -->
+                <button 
+                  *ngIf="message.from_user_id !== currentUser.user_id && message.status !== 'read'"
+                  (click)="markAsRead(message.message_id)"
+                  class="btn-read"
+                >
+                  Marcar como lida
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Input de nova mensagem -->
+        <div class="message-input-container">
+          <input 
+            type="text" 
+            [(ngModel)]="newMessage" 
+            placeholder="Digite sua mensagem..."
+            class="message-input"
+            (keyup.enter)="sendMessage()"
+          />
+          <button (click)="sendMessage()" class="btn btn-send">Enviar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

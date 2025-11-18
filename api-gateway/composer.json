@@ -1,0 +1,24 @@
+{
+    "name": "chat4all/api-gateway",
+    "description": "API Gateway - REST to gRPC converter",
+    "type": "project",
+    "require": {
+        "php": "^8.4",
+        "ext-pdo": "*",
+        "ext-redis": "*",
+        "ext-grpc": "*",
+        "grpc/grpc": "^1.57",
+        "google/protobuf": "^3.25"
+    },
+    "autoload": {
+        "psr-4": {
+            "Chat4All\\Gateway\\": "src/",
+            "Auth\\": "../shared/generated/auth/",
+            "Message\\": "../shared/generated/message/",
+            "Conversation\\": "../shared/generated/conversation/"
+        }
+    },
+    "config": {
+        "optimize-autoloader": true
+    }
+}

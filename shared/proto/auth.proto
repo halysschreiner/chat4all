@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package auth;
+
+// Serviço de Autenticação
+service AuthService {
+  // Registrar novo usuário
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  
+  // Login de usuário
+  rpc Login(LoginRequest) returns (LoginResponse);
+  
+  // Validar token JWT
+  rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
+  
+  // Obter informações do usuário
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+}
+
+// ===== Mensagens de Registro =====
+
+message RegisterRequest {
+  string username = 1;
+  string email = 2;
+  string password = 3;
+}
+
+message RegisterResponse {
+  bool success = 1;
+  string message = 2;
+  User user = 3;
+}
+
+// ===== Mensagens de Login =====
+
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message LoginResponse {
+  bool success = 1;
+  string message = 2;
+  string token = 3; // JWT token
+  User user = 4;
+}
+
+// ===== Mensagens de Validação de Token =====
+
+message ValidateTokenRequest {
+  string token = 1;
+}
+
+message ValidateTokenResponse {
+  bool valid = 1;
+  string user_id = 2;
+  string message = 3;
+}
+
+// ===== Mensagens de Usuário =====
+
+message GetUserRequest {
+  string user_id = 1;
+}
+
+message GetUserResponse {
+  bool success = 1;
+  User user = 2;
+}
+
+// ===== Tipos de Dados =====
+
+message User {
+  string user_id = 1;
+  string username = 2;
+  string email = 3;
+  string created_at = 4;
+  string status = 5;
+}

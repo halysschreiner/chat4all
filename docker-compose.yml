@@ -1,0 +1,140 @@
+version: '3.8'
+
+services:
+  # Base de dados PostgreSQL
+  postgres:
+    image: postgres:16
+    container_name: chat4all_postgres
+    environment:
+      POSTGRES_DB: chat4all
+      POSTGRES_USER: chat4all
+      POSTGRES_PASSWORD: chat4all123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - chat4all_network
+
+  # Cache Redis
+  redis:
+    image: redis:7-alpine
+    container_name: chat4all_redis
+    ports:
+      - "6379:6379"
+    networks:
+      - chat4all_network
+
+  # Serviço de Autenticação (gRPC)
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile
+    container_name: chat4all_auth_service
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: chat4all
+      DB_USER: chat4all
+      DB_PASSWORD: chat4all123
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      GRPC_PORT: 50051
+    ports:
+      - "50051:50051"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - chat4all_network
+
+  # Serviço de Mensagens (gRPC)
+  message-service:
+    build:
+      context: ./services/message-service
+      dockerfile: Dockerfile
+    container_name: chat4all_message_service
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: chat4all
+      DB_USER: chat4all
+      DB_PASSWORD: chat4all123
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      GRPC_PORT: 50052
+    ports:
+      - "50052:50052"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - chat4all_network
+
+  # Serviço de Conversas (gRPC)
+  conversation-service:
+    build:
+      context: ./services/conversation-service
+      dockerfile: Dockerfile
+    container_name: chat4all_conversation_service
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: chat4all
+      DB_USER: chat4all
+      DB_PASSWORD: chat4all123
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      GRPC_PORT: 50053
+    ports:
+      - "50053:50053"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - chat4all_network
+
+  # API Gateway (REST -> gRPC)
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: chat4all_api_gateway
+    environment:
+      AUTH_SERVICE_HOST: auth-service
+      AUTH_SERVICE_PORT: 50051
+      MESSAGE_SERVICE_HOST: message-service
+      MESSAGE_SERVICE_PORT: 50052
+      CONVERSATION_SERVICE_HOST: conversation-service
+      CONVERSATION_SERVICE_PORT: 50053
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "8080:80"
+    depends_on:
+      - auth-service
+      - message-service
+      - conversation-service
+    networks:
+      - chat4all_network
+
+  # Frontend Angular
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: chat4all_frontend
+    ports:
+      - "4200:80"
+    depends_on:
+      - api-gateway
+    networks:
+      - chat4all_network
+
+networks:
+  chat4all_network:
+    driver: bridge
+
+volumes:
+  postgres_data:

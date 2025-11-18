@@ -1,0 +1,110 @@
+syntax = "proto3";
+
+package conversation;
+
+// Serviço de Conversas
+service ConversationService {
+  // Criar conversa privada
+  rpc CreatePrivateConversation(CreatePrivateConversationRequest) returns (CreateConversationResponse);
+  
+  // Criar grupo
+  rpc CreateGroup(CreateGroupRequest) returns (CreateConversationResponse);
+  
+  // Adicionar membros ao grupo
+  rpc AddMembers(AddMembersRequest) returns (AddMembersResponse);
+  
+  // Listar conversas do usuário
+  rpc ListConversations(ListConversationsRequest) returns (ListConversationsResponse);
+  
+  // Obter detalhes de uma conversa
+  rpc GetConversation(GetConversationRequest) returns (GetConversationResponse);
+}
+
+// ===== Criar Conversa Privada =====
+
+message CreatePrivateConversationRequest {
+  string user_id = 1; // Criador
+  string other_user_id = 2; // Outro usuário
+}
+
+message CreateConversationResponse {
+  bool success = 1;
+  string message = 2;
+  Conversation conversation = 3;
+}
+
+// ===== Criar Grupo =====
+
+message CreateGroupRequest {
+  string user_id = 1; // Criador
+  string group_name = 2;
+  repeated string member_user_ids = 3; // Lista de IDs dos membros
+}
+
+// ===== Adicionar Membros =====
+
+message AddMembersRequest {
+  string conversation_id = 1;
+  repeated string user_ids = 2; // IDs dos novos membros
+  string added_by_user_id = 3; // Quem está adicionando
+}
+
+message AddMembersResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// ===== Listar Conversas =====
+
+message ListConversationsRequest {
+  string user_id = 1;
+  int32 limit = 2; // Quantidade máxima de conversas
+  int32 offset = 3; // Paginação
+}
+
+message ListConversationsResponse {
+  bool success = 1;
+  repeated ConversationSummary conversations = 2;
+}
+
+// ===== Obter Conversa =====
+
+message GetConversationRequest {
+  string conversation_id = 1;
+  string user_id = 2; // Para verificar se tem acesso
+}
+
+message GetConversationResponse {
+  bool success = 1;
+  string message = 2;
+  Conversation conversation = 3;
+}
+
+// ===== Tipos de Dados =====
+
+message Conversation {
+  string conversation_id = 1;
+  string type = 2; // "private" ou "group"
+  string name = 3; // Nome do grupo (null para privadas)
+  string created_by = 4;
+  string created_at = 5;
+  repeated Member members = 6;
+  bool is_active = 7;
+}
+
+message Member {
+  string user_id = 1;
+  string username = 2;
+  string role = 3; // "owner", "admin", "member"
+  string joined_at = 4;
+}
+
+message ConversationSummary {
+  string conversation_id = 1;
+  string type = 2;
+  string name = 3;
+  string last_message = 4;
+  string last_message_at = 5;
+  int32 unread_count = 6;
+  repeated Member members = 7;
+}
