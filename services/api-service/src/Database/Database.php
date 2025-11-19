@@ -83,6 +83,43 @@ class Database
     }
 
     /**
+     * Buscar usuário por email ou telefone
+     */
+    public function getUserByEmailOrPhone(string $identifier): ?array
+    {
+        $stmt = $this->pdo->prepare('
+            SELECT user_id, username, email, phone, password_hash, status
+            FROM users
+            WHERE (email = :identifier OR phone = :identifier) AND status = \'active\'
+        ');
+        $stmt->execute(['identifier' => $identifier]);
+        
+        $user = $stmt->fetch();
+        return $user ?: null;
+    }
+
+    /**
+     * Criar novo usuário
+     */
+    public function createUser(string $username, ?string $email, ?string $phone, string $passwordHash): array
+    {
+        $stmt = $this->pdo->prepare('
+            INSERT INTO users (username, email, phone, password_hash)
+            VALUES (:username, :email, :phone, :password_hash)
+            RETURNING user_id, username, email, phone, created_at, status
+        ');
+        
+        $stmt->execute([
+            'username' => $username,
+            'email' => $email,
+            'phone' => $phone,
+            'password_hash' => $passwordHash
+        ]);
+        
+        return $stmt->fetch();
+    }
+
+    /**
      * Inserir nova mensagem no banco
      */
     public function insertMessage(array $data): string

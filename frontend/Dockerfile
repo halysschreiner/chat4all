@@ -1,36 +1,28 @@
-# Frontend Dockerfile - Build de produção simplificado
-
-# Stage 1: Build
-FROM node:18 AS builder
+# Stage 1: Build the Angular app
+FROM node:20-alpine as build
 
 WORKDIR /app
 
-# Copiar package files
-COPY package*.json ./
-
-# Instalar dependências
+COPY frontend/package.json frontend/package-lock.json* ./
 RUN npm install
 
-# Copiar código fonte
-COPY . .
+COPY frontend/ .
+RUN npm run build -- --configuration production
 
-# Build da aplicação
-RUN npm run build --prod || npm run build
-
-# Stage 2: Servir com Nginx
+# Stage 2: Serve with Nginx
 FROM nginx:alpine
 
-# Copiar build para nginx
-COPY --from=builder /app/dist/* /usr/share/nginx/html/
+COPY --from=build /app/dist/chat4all-frontend /usr/share/nginx/html
 
-# Configurar nginx
-RUN echo 'server { \n\
-    listen 80; \n\
-    location / { \n\
-        root /usr/share/nginx/html; \n\
-        index index.html; \n\
-        try_files $uri $uri/ /index.html; \n\
-    } \n\
+# Copy custom nginx config for SPA routing
+RUN echo 'server { \
+    listen 80; \
+    server_name localhost; \
+    root /usr/share/nginx/html; \
+    index index.html; \
+    location / { \
+        try_files $uri $uri/ /index.html; \
+    } \
 }' > /etc/nginx/conf.d/default.conf
 
 EXPOSE 80

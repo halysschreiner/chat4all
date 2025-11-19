@@ -1,0 +1,115 @@
+<div class="chat-container">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="user-info">
+        <h3>{{ currentUser.username }}</h3>
+        <button (click)="logout()" class="btn-icon" title="Logout">
+          <i class="icon">🚪</i>
+        </button>
+      </div>
+      <div class="actions">
+        <button (click)="showNewConversationModal = true" class="btn-secondary">New Chat</button>
+        <button (click)="showNewGroupModal = true" class="btn-secondary">New Group</button>
+      </div>
+    </div>
+
+    <div class="conversations-list">
+      <div *ngFor="let conv of conversations" 
+           class="conversation-item" 
+           [class.active]="selectedConversation?.conversation_id === conv.conversation_id"
+           (click)="selectConversation(conv)">
+        <div class="avatar">
+          {{ conv.name.charAt(0).toUpperCase() }}
+        </div>
+        <div class="conv-info">
+          <div class="conv-name">{{ conv.name }}</div>
+          <div class="conv-last-msg">{{ conv.last_message || 'No messages yet' }}</div>
+        </div>
+        <div class="conv-meta">
+          <span *ngIf="conv.unread_count > 0" class="badge">{{ conv.unread_count }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Chat Area -->
+  <div class="main-chat">
+    <div *ngIf="!selectedConversation" class="no-chat-selected">
+      <div class="placeholder-content">
+        <h2>Chat4All</h2>
+        <p>Select a conversation to start messaging</p>
+      </div>
+    </div>
+
+    <div *ngIf="selectedConversation" class="chat-view">
+      <div class="chat-header">
+        <div class="avatar">
+          {{ selectedConversation.name.charAt(0).toUpperCase() }}
+        </div>
+        <div class="header-info">
+          <h3>{{ selectedConversation.name }}</h3>
+          <span class="status">{{ selectedConversation.type === 'group' ? 'Group' : 'Private' }}</span>
+        </div>
+      </div>
+
+      <div class="messages-list" #scrollMe>
+        <div *ngFor="let msg of messages" 
+             class="message-bubble" 
+             [class.sent]="msg.from_user_id === currentUser.user_id"
+             [class.received]="msg.from_user_id !== currentUser.user_id">
+          <div class="message-content">
+            {{ msg.content }}
+          </div>
+          <div class="message-meta">
+            <span class="time">{{ msg.created_at | date:'shortTime' }}</span>
+            <span *ngIf="msg.from_user_id === currentUser.user_id" class="status-icon">
+              {{ msg.status === 'READ' ? '✓✓' : (msg.status === 'DELIVERED' ? '✓✓' : '✓') }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="message-input">
+        <input type="text" 
+               [(ngModel)]="newMessage" 
+               (keyup.enter)="sendMessage()"
+               placeholder="Type a message...">
+        <button (click)="sendMessage()" class="btn-send">➤</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modals -->
+  <div *ngIf="showNewConversationModal" class="modal-overlay">
+    <div class="modal">
+      <h3>New Conversation</h3>
+      <div class="form-group">
+        <label>User ID (Phone)</label>
+        <input type="text" [(ngModel)]="newConversationUserId" placeholder="Enter User ID">
+      </div>
+      <div class="modal-actions">
+        <button (click)="showNewConversationModal = false" class="btn-text">Cancel</button>
+        <button (click)="startPrivateConversation()" class="btn-primary">Start</button>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="showNewGroupModal" class="modal-overlay">
+    <div class="modal">
+      <h3>New Group</h3>
+      <div class="form-group">
+        <label>Group Name</label>
+        <input type="text" [(ngModel)]="newGroupName" placeholder="Enter Group Name">
+      </div>
+      <div class="form-group">
+        <label>Members (User IDs, comma separated)</label>
+        <input type="text" [(ngModel)]="newGroupMembers" placeholder="id1, id2, id3">
+      </div>
+      <div class="modal-actions">
+        <button (click)="showNewGroupModal = false" class="btn-text">Cancel</button>
+        <button (click)="createGroup()" class="btn-primary">Create</button>
+      </div>
+    </div>
+  </div>
+</div>

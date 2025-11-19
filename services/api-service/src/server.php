@@ -4,6 +4,7 @@ require __DIR__ . '/../vendor/autoload.php';
 
 use Grpc\Server;
 use Chat4All\Api\Grpc\MessageService;
+use Chat4All\Api\Grpc\AuthService;
 use Chat4All\Api\Database\Database;
 use Chat4All\Api\Service\KafkaProducer;
 use Monolog\Logger;
@@ -27,7 +28,10 @@ try {
     
     $db = new Database($dbHost, $dbPort, $dbName, $dbUser, $dbPass, $logger);
     $kafka = new KafkaProducer($kafkaBrokers, $kafkaTopic, $logger);
+    $jwtSecret = getenv('JWT_SECRET') ?: 'default-secret';
+    
     $service = new MessageService($db, $kafka, $logger);
+    $authService = new AuthService($db, $logger, $jwtSecret);
     
     $server = new Server();
     $server->addHttp2Port('0.0.0.0:50051');
@@ -56,7 +60,7 @@ try {
         $serviceName = $parts[0];
         $methodName = $parts[1];
         
-        if ($serviceName !== 'message.MessageService') {
+        if ($serviceName !== 'message.MessageService' && $serviceName !== 'auth.AuthService') {
              $logger->warning("Unknown service: $serviceName");
              continue;
         }
@@ -76,18 +80,32 @@ try {
         try {
             $response = null;
             
-            if ($methodName === 'SendMessage') {
-                $request = new \Message\SendMessageRequest();
-                $request->mergeFromString($payload);
-                $response = $service->SendMessage($request);
-            } elseif ($methodName === 'ListMessages') {
-                $request = new \Message\ListMessagesRequest();
-                $request->mergeFromString($payload);
-                $response = $service->ListMessages($request);
-            } else {
-                $logger->warning("Unknown method: $methodName");
-                // TODO: Send unimplemented status
-                continue;
+            if ($serviceName === 'message.MessageService') {
+                if ($methodName === 'SendMessage') {
+                    $request = new \Message\SendMessageRequest();
+                    $request->mergeFromString($payload);
+                    $response = $service->SendMessage($request);
+                } elseif ($methodName === 'ListMessages') {
+                    $request = new \Message\ListMessagesRequest();
+                    $request->mergeFromString($payload);
+                    $response = $service->ListMessages($request);
+                } else {
+                    $logger->warning("Unknown method: $methodName");
+                    continue;
+                }
+            } elseif ($serviceName === 'auth.AuthService') {
+                if ($methodName === 'Register') {
+                    $request = new \Auth\RegisterRequest();
+                    $request->mergeFromString($payload);
+                    $response = $authService->Register($request);
+                } elseif ($methodName === 'Login') {
+                    $request = new \Auth\LoginRequest();
+                    $request->mergeFromString($payload);
+                    $response = $authService->Login($request);
+                } else {
+                    $logger->warning("Unknown method: $methodName");
+                    continue;
+                }
             }
             
             if ($response) {

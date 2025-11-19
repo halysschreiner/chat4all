@@ -60,6 +60,7 @@ switch ($path) {
             $request = new Auth\RegisterRequest();
             $request->setUsername($data['username'] ?? '');
             $request->setEmail($data['email'] ?? '');
+            $request->setPhone($data['phone'] ?? '');
             $request->setPassword($data['password'] ?? '');
             
             list($response, $status) = $authClient->Register($request)->wait();
@@ -71,6 +72,7 @@ switch ($path) {
                     'user_id' => $response->getUser()->getUserId(),
                     'username' => $response->getUser()->getUsername(),
                     'email' => $response->getUser()->getEmail(),
+                    'phone' => $response->getUser()->getPhone(),
                     'created_at' => $response->getUser()->getCreatedAt(),
                 ] : null
             ]);
@@ -83,6 +85,7 @@ switch ($path) {
             
             $request = new Auth\LoginRequest();
             $request->setEmail($data['email'] ?? '');
+            $request->setPhone($data['phone'] ?? '');
             $request->setPassword($data['password'] ?? '');
             
             list($response, $status) = $authClient->Login($request)->wait();
@@ -95,6 +98,7 @@ switch ($path) {
                     'user_id' => $response->getUser()->getUserId(),
                     'username' => $response->getUser()->getUsername(),
                     'email' => $response->getUser()->getEmail(),
+                    'phone' => $response->getUser()->getPhone(),
                 ] : null
             ]);
         }

@@ -150,7 +150,9 @@ services:
 
   # Web Interface - Interface de usuário
   web:
-    build: ./web
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
     container_name: chat4all-web
     ports:
       - "9000:80"

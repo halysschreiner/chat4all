@@ -19,7 +19,7 @@
 ### 1. Iniciar os Serviços
 
 ```bash
-cd /home/halys/projects/ufg/sd/chat4all
+cd /home/halys/projects/ufg/sd/chat4all-gemini
 ./scripts/start.sh
 ```
 

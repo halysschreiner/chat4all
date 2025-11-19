@@ -30,20 +30,20 @@ setup:
 # Gerar código gRPC
 proto:
 	@echo "🔨 Gerando código gRPC..."
-	@mkdir -p shared/generated/auth shared/generated/message shared/generated/conversation
+	@mkdir -p shared/generated
 	@protoc --proto_path=shared/proto \
-		--php_out=shared/generated/auth \
-		--grpc_out=shared/generated/auth \
+		--php_out=shared/generated \
+		--grpc_out=shared/generated \
 		--plugin=protoc-gen-grpc=$$(which grpc_php_plugin) \
 		shared/proto/auth.proto
 	@protoc --proto_path=shared/proto \
-		--php_out=shared/generated/message \
-		--grpc_out=shared/generated/message \
+		--php_out=shared/generated \
+		--grpc_out=shared/generated \
 		--plugin=protoc-gen-grpc=$$(which grpc_php_plugin) \
 		shared/proto/message.proto
 	@protoc --proto_path=shared/proto \
-		--php_out=shared/generated/conversation \
-		--grpc_out=shared/generated/conversation \
+		--php_out=shared/generated \
+		--grpc_out=shared/generated \
 		--plugin=protoc-gen-grpc=$$(which grpc_php_plugin) \
 		shared/proto/conversation.proto
 	@echo "✓ Código gRPC gerado!"
