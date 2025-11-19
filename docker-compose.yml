@@ -51,6 +51,26 @@ services:
       timeout: 5s
       retries: 5
 
+  # API Gateway - REST to gRPC
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    container_name: chat4all-gateway
+    ports:
+      - "8000:80"
+    environment:
+      AUTH_SERVICE_HOST: api-service
+      AUTH_SERVICE_PORT: 50051
+      MESSAGE_SERVICE_HOST: api-service
+      MESSAGE_SERVICE_PORT: 50051
+      CONVERSATION_SERVICE_HOST: api-service
+      CONVERSATION_SERVICE_PORT: 50051
+    depends_on:
+      - api-service
+    networks:
+      - chat4all-network
+
   # Kafka - Message Broker
   kafka:
     image: confluentinc/cp-kafka:7.5.0
@@ -79,10 +99,13 @@ services:
 
   # API Service - Slim Framework
   api-service:
-    build: ./services/api-service
+    build:
+      context: .
+      dockerfile: services/api-service/Dockerfile
     container_name: chat4all-api
     ports:
       - "8080:8080"
+      - "50051:50051"
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
@@ -104,7 +127,9 @@ services:
 
   # Router Worker - Processa mensagens do Kafka
   router-worker:
-    build: ./workers/router-worker
+    build:
+      context: .
+      dockerfile: workers/router-worker/Dockerfile
     container_name: chat4all-router-worker
     environment:
       DB_HOST: postgres

@@ -1,31 +1,26 @@
 FROM php:8.3-cli-alpine
 
-# Instalar dependências do sistema
-RUN apk add --no-cache \
-    postgresql-dev \
-    librdkafka-dev \
-    autoconf \
-    g++ \
-    make \
-    git
+# Install dependencies and extensions using mlocati/php-extension-installer
+COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/local/bin/
+RUN install-php-extensions pdo pdo_pgsql pcntl rdkafka
 
-# Instalar extensões PHP
-RUN docker-php-ext-install pdo pdo_pgsql pcntl
+# Install system dependencies
+RUN apk add --no-cache git zip unzip
 
-# Instalar rdkafka
-RUN pecl install rdkafka && docker-php-ext-enable rdkafka
-
-# Instalar Composer
+# Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Diretório de trabalho
+# Workdir
 WORKDIR /app
 
-# Copiar código da aplicação
-COPY . .
+# Copy composer.json
+COPY workers/router-worker/composer.json .
 
-# Instalar dependências
-RUN composer install --no-dev --optimize-autoloader --no-interaction || true
+# Install dependencies
+RUN mkdir -p src && composer install --no-dev --optimize-autoloader --no-interaction
 
-# Comando de inicialização: instalar deps e rodar
-CMD composer install --no-dev --optimize-autoloader --no-interaction && php consumer.php
+# Copy application code
+COPY workers/router-worker/ .
+
+# Command
+CMD ["php", "consumer.php"]

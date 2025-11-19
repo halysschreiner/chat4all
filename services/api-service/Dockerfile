@@ -1,37 +1,36 @@
 FROM php:8.3-cli-alpine
 
-# Instalar dependências do sistema
-RUN apk add --no-cache \
-    postgresql-dev \
-    librdkafka-dev \
-    autoconf \
-    g++ \
-    make \
-    git \
-    zip \
-    unzip
+# Install dependencies and extensions using mlocati/php-extension-installer
+COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/local/bin/
 
-# Instalar extensões PHP
-RUN docker-php-ext-install pdo pdo_pgsql
+# Install extensions: pdo, pdo_pgsql, rdkafka, grpc, protobuf
+# This uses pre-built binaries when available, avoiding long compilation times
+RUN install-php-extensions pdo pdo_pgsql rdkafka grpc protobuf
 
-# Instalar rdkafka
-RUN pecl install rdkafka && docker-php-ext-enable rdkafka
+# Install system dependencies
+RUN apk add --no-cache git zip unzip
 
-# Instalar Composer
+# Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Diretório de trabalho
+# Workdir
 WORKDIR /app
 
-# Copiar código da aplicação primeiro
-COPY . .
+# Copy composer.json
+COPY services/api-service/composer.json .
 
-# Instalar dependências
-RUN composer install --no-dev --optimize-autoloader --no-interaction || true
+# Copy shared folder (needed for autoloading generated classes)
+COPY shared/ /app/shared/
 
-# Expor porta
-EXPOSE 8080
+# Install dependencies
+# We create src directory to avoid composer warnings about missing mapped paths
+RUN mkdir -p src && composer install --no-dev --optimize-autoloader --no-interaction
 
-# Comando de inicialização: instalar deps e rodar servidor web com router
-CMD composer install --no-dev --optimize-autoloader --no-interaction && \
-    php -S 0.0.0.0:8080 -t public/ public/router.php
+# Copy application code
+COPY services/api-service/ .
+
+# Expose gRPC port
+EXPOSE 50051
+
+# Command to run the gRPC server
+CMD ["php", "src/server.php"]

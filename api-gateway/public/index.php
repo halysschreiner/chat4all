@@ -41,6 +41,16 @@ $path = parse_url($requestUri, PHP_URL_PATH);
 
 // Router simples
 switch ($path) {
+    // ===== HEALTH CHECK =====
+    case '/':
+        echo json_encode([
+            'status' => 'ok',
+            'service' => 'Chat4All API Gateway',
+            'version' => '1.0.0',
+            'backend' => 'gRPC'
+        ]);
+        break;
+
     // ===== AUTH ENDPOINTS =====
     
     case '/api/auth/register':
@@ -125,9 +135,7 @@ switch ($path) {
             $request->setGroupName($data['group_name'] ?? '');
             
             if (!empty($data['member_user_ids'])) {
-                foreach ($data['member_user_ids'] as $memberId) {
-                    $request->addMemberUserIds($memberId);
-                }
+                $request->setMemberUserIds($data['member_user_ids']);
             }
             
             list($response, $status) = $conversationClient->CreateGroup($request)->wait();
