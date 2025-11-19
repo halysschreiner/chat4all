@@ -103,28 +103,20 @@ class MessageService
             $limit = $request->getLimit() ?: 50;
             $offset = $request->getOffset() ?: 0;
             
-            $pdo = $this->database->getConnection();
-            $stmt = $pdo->prepare("
-                SELECT * FROM messages 
-                WHERE conversation_id = :conversation_id 
-                ORDER BY created_at DESC 
-                LIMIT :limit OFFSET :offset
-            ");
-            $stmt->bindValue(':conversation_id', $conversationId);
-            $stmt->bindValue(':limit', $limit, \PDO::PARAM_INT);
-            $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
-            $stmt->execute();
+            $messagesData = $this->database->getMessagesByConversation($conversationId, $limit, $offset);
             
             $messages = [];
-            while ($row = $stmt->fetch()) {
+            foreach ($messagesData as $data) {
                 $msg = new Message();
-                $msg->setMessageId($row['message_id']);
-                $msg->setConversationId($row['conversation_id']);
-                $msg->setFromUserId($row['from_user_id']);
-                $msg->setContent($row['content']);
-                $msg->setMessageType($row['message_type']);
-                $msg->setStatus($row['status']);
-                $msg->setCreatedAt($row['created_at']);
+                $msg->setMessageId($data['message_id']);
+                $msg->setConversationId($data['conversation_id']);
+                $msg->setFromUserId($data['from_user_id']);
+                $msg->setFromUsername($data['from_username'] ?? '');
+                $msg->setMessageType($data['message_type']);
+                $msg->setContent($data['content']);
+                $msg->setStatus($data['status']);
+                $msg->setCreatedAt($data['created_at']);
+                
                 $messages[] = $msg;
             }
             

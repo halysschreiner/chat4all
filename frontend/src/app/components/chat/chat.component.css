@@ -287,3 +287,14 @@
   border-radius: 4px;
   cursor: pointer;
 }
+
+.message-sender {
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: #ff9800;
+  margin-bottom: 0.25rem;
+}
+
+.status-icon.read {
+  color: #4fc3f7; /* Light blue for read status */
+}

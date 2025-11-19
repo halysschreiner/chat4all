@@ -58,12 +58,17 @@
              class="message-bubble" 
              [class.sent]="msg.from_user_id === currentUser.user_id"
              [class.received]="msg.from_user_id !== currentUser.user_id">
+          
+          <div *ngIf="selectedConversation.type === 'group' && msg.from_user_id !== currentUser.user_id" class="message-sender">
+            {{ msg.from_username || 'Unknown' }}
+          </div>
+
           <div class="message-content">
             {{ msg.content }}
           </div>
           <div class="message-meta">
             <span class="time">{{ msg.created_at | date:'shortTime' }}</span>
-            <span *ngIf="msg.from_user_id === currentUser.user_id" class="status-icon">
+            <span *ngIf="msg.from_user_id === currentUser.user_id" class="status-icon" [class.read]="msg.status === 'READ'">
               {{ msg.status === 'READ' ? '✓✓' : (msg.status === 'DELIVERED' ? '✓✓' : '✓') }}
             </span>
           </div>
