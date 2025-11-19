@@ -95,13 +95,19 @@ export class ChatComponent implements OnInit, AfterViewChecked {
     if (!this.newConversationUserId) return;
     
     this.chatService.createPrivateConversation(this.newConversationUserId)
-      .subscribe(response => {
-        if (response.success) {
-          this.showNewConversationModal = false;
-          this.newConversationUserId = '';
-          this.loadConversations();
-          // Select the new conversation
-          // Ideally we would find it in the list, but for now just reload
+      .subscribe({
+        next: (response) => {
+          if (response.success) {
+            this.showNewConversationModal = false;
+            this.newConversationUserId = '';
+            this.loadConversations();
+          } else {
+            alert(response.message || 'Failed to create conversation');
+          }
+        },
+        error: (error) => {
+          console.error('Error creating conversation:', error);
+          alert('An error occurred while creating the conversation.');
         }
       });
   }
@@ -112,12 +118,20 @@ export class ChatComponent implements OnInit, AfterViewChecked {
     const members = this.newGroupMembers.split(',').map(id => id.trim());
     
     this.chatService.createGroupConversation(this.newGroupName, members)
-      .subscribe(response => {
-        if (response.success) {
-          this.showNewGroupModal = false;
-          this.newGroupName = '';
-          this.newGroupMembers = '';
-          this.loadConversations();
+      .subscribe({
+        next: (response) => {
+          if (response.success) {
+            this.showNewGroupModal = false;
+            this.newGroupName = '';
+            this.newGroupMembers = '';
+            this.loadConversations();
+          } else {
+            alert(response.message || 'Failed to create group');
+          }
+        },
+        error: (error) => {
+          console.error('Error creating group:', error);
+          alert('An error occurred while creating the group.');
         }
       });
   }

@@ -5,6 +5,7 @@ require __DIR__ . '/../vendor/autoload.php';
 use Grpc\Server;
 use Chat4All\Api\Grpc\MessageService;
 use Chat4All\Api\Grpc\AuthService;
+use Chat4All\Api\Grpc\ConversationService;
 use Chat4All\Api\Database\Database;
 use Chat4All\Api\Service\KafkaProducer;
 use Monolog\Logger;
@@ -32,6 +33,7 @@ try {
     
     $service = new MessageService($db, $kafka, $logger);
     $authService = new AuthService($db, $logger, $jwtSecret);
+    $conversationService = new ConversationService($db, $logger);
     
     $server = new Server();
     $server->addHttp2Port('0.0.0.0:50051');
@@ -60,7 +62,7 @@ try {
         $serviceName = $parts[0];
         $methodName = $parts[1];
         
-        if ($serviceName !== 'message.MessageService' && $serviceName !== 'auth.AuthService') {
+        if ($serviceName !== 'message.MessageService' && $serviceName !== 'auth.AuthService' && $serviceName !== 'conversation.ConversationService') {
              $logger->warning("Unknown service: $serviceName");
              continue;
         }
@@ -102,6 +104,27 @@ try {
                     $request = new \Auth\LoginRequest();
                     $request->mergeFromString($payload);
                     $response = $authService->Login($request);
+                } elseif ($methodName === 'ValidateToken') {
+                    $request = new \Auth\ValidateTokenRequest();
+                    $request->mergeFromString($payload);
+                    $response = $authService->ValidateToken($request);
+                } else {
+                    $logger->warning("Unknown method: $methodName");
+                    continue;
+                }
+            } elseif ($serviceName === 'conversation.ConversationService') {
+                if ($methodName === 'CreatePrivateConversation') {
+                    $request = new \Conversation\CreatePrivateConversationRequest();
+                    $request->mergeFromString($payload);
+                    $response = $conversationService->CreatePrivateConversation($request);
+                } elseif ($methodName === 'CreateGroup') {
+                    $request = new \Conversation\CreateGroupRequest();
+                    $request->mergeFromString($payload);
+                    $response = $conversationService->CreateGroup($request);
+                } elseif ($methodName === 'ListConversations') {
+                    $request = new \Conversation\ListConversationsRequest();
+                    $request->mergeFromString($payload);
+                    $response = $conversationService->ListConversations($request);
                 } else {
                     $logger->warning("Unknown method: $methodName");
                     continue;

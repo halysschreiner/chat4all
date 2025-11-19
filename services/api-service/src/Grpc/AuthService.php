@@ -10,6 +10,7 @@ use Auth\LoginResponse;
 use Auth\User;
 use Monolog\Logger;
 use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
 
 class AuthService
 {
@@ -122,6 +123,28 @@ class AuthService
         } catch (\Exception $e) {
             $this->logger->error("Login error: " . $e->getMessage());
             $response->setSuccess(false);
+            $response->setMessage($e->getMessage());
+        }
+        
+        return $response;
+    }
+
+    public function ValidateToken(\Auth\ValidateTokenRequest $request): \Auth\ValidateTokenResponse
+    {
+        $response = new \Auth\ValidateTokenResponse();
+        
+        try {
+            $token = $request->getToken();
+            
+            $decoded = JWT::decode($token, new \Firebase\JWT\Key($this->jwtSecret, 'HS256'));
+            
+            $response->setValid(true);
+            $response->setUserId($decoded->sub);
+            $response->setMessage("Token is valid");
+            
+        } catch (\Exception $e) {
+            $this->logger->warning("Token validation failed: " . $e->getMessage());
+            $response->setValid(false);
             $response->setMessage($e->getMessage());
         }
         

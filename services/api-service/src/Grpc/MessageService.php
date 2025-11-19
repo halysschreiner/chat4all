@@ -48,7 +48,7 @@ class MessageService
             $timestamp = date('Y-m-d H:i:s');
             
             $payload = [
-                'id' => $messageId,
+                'message_id' => $messageId,
                 'conversation_id' => $conversationId,
                 'from_user_id' => $fromUserId,
                 'content' => $content,
@@ -56,6 +56,10 @@ class MessageService
                 'status' => 'SENT',
                 'created_at' => $timestamp
             ];
+            
+            // Save to database first (Outbox pattern or just simple save)
+            // For this architecture, we save to DB then send to Kafka for async processing
+            $this->database->insertMessage($payload);
             
             // Send to Kafka
             $this->kafkaProducer->publish(
@@ -68,7 +72,7 @@ class MessageService
             
             // Construct returned message object
             $msg = new Message();
-            $msg->setId($messageId);
+            $msg->setMessageId($messageId);
             $msg->setConversationId($conversationId);
             $msg->setFromUserId($fromUserId);
             $msg->setContent($content);
@@ -114,7 +118,7 @@ class MessageService
             $messages = [];
             while ($row = $stmt->fetch()) {
                 $msg = new Message();
-                $msg->setId($row['id']);
+                $msg->setMessageId($row['message_id']);
                 $msg->setConversationId($row['conversation_id']);
                 $msg->setFromUserId($row['from_user_id']);
                 $msg->setContent($row['content']);

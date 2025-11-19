@@ -31,6 +31,7 @@ CREATE INDEX idx_users_username ON users(username);
 CREATE TABLE IF NOT EXISTS conversations (
     conversation_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     type VARCHAR(20) NOT NULL CHECK (type IN ('private', 'group')),
+    name VARCHAR(255), -- Nome do grupo (opcional para privadas)
     created_by UUID NOT NULL REFERENCES users(user_id),
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW(),

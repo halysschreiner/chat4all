@@ -325,4 +325,94 @@ class Database
             'details' => json_encode($details)
         ]);
     }
+
+    /**
+     * Criar nova conversa
+     */
+    public function createConversation(string $type, ?string $name, string $createdBy): string
+    {
+        $stmt = $this->pdo->prepare('
+            INSERT INTO conversations (type, name, created_by)
+            VALUES (:type, :name, :created_by)
+            RETURNING conversation_id
+        ');
+        
+        $stmt->execute([
+            'type' => $type,
+            'name' => $name,
+            'created_by' => $createdBy
+        ]);
+        
+        $result = $stmt->fetch();
+        return $result['conversation_id'];
+    }
+
+    /**
+     * Adicionar membro à conversa
+     */
+    public function addConversationMember(string $conversationId, string $userId, string $role = 'member'): void
+    {
+        $stmt = $this->pdo->prepare('
+            INSERT INTO conversation_members (conversation_id, user_id, role)
+            VALUES (:conversation_id, :user_id, :role)
+            ON CONFLICT (conversation_id, user_id) DO NOTHING
+        ');
+        
+        $stmt->execute([
+            'conversation_id' => $conversationId,
+            'user_id' => $userId,
+            'role' => $role
+        ]);
+    }
+
+    /**
+     * Verificar se já existe conversa privada entre dois usuários
+     */
+    public function checkPrivateConversationExists(string $user1Id, string $user2Id): ?string
+    {
+        $stmt = $this->pdo->prepare('
+            SELECT c.conversation_id
+            FROM conversations c
+            JOIN conversation_members cm1 ON c.conversation_id = cm1.conversation_id
+            JOIN conversation_members cm2 ON c.conversation_id = cm2.conversation_id
+            WHERE c.type = \'private\'
+            AND cm1.user_id = :user1_id
+            AND cm2.user_id = :user2_id
+            LIMIT 1
+        ');
+        
+        $stmt->execute([
+            'user1_id' => $user1Id,
+            'user2_id' => $user2Id
+        ]);
+        
+        $result = $stmt->fetch();
+        return $result ? $result['conversation_id'] : null;
+    }
+
+    /**
+     * Obter detalhes da conversa
+     */
+    public function getConversationById(string $conversationId): ?array
+    {
+        $stmt = $this->pdo->prepare('
+            SELECT * FROM conversations WHERE conversation_id = :conversation_id
+        ');
+        $stmt->execute(['conversation_id' => $conversationId]);
+        $conversation = $stmt->fetch();
+        
+        if (!$conversation) return null;
+        
+        // Buscar membros
+        $stmtMembers = $this->pdo->prepare('
+            SELECT u.user_id, u.username, cm.role, cm.joined_at
+            FROM conversation_members cm
+            JOIN users u ON cm.user_id = u.user_id
+            WHERE cm.conversation_id = :conversation_id
+        ');
+        $stmtMembers->execute(['conversation_id' => $conversationId]);
+        $conversation['members'] = $stmtMembers->fetchAll();
+        
+        return $conversation;
+    }
 }
