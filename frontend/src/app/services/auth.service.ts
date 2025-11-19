@@ -6,7 +6,7 @@ import { BehaviorSubject, Observable, tap } from 'rxjs';
   providedIn: 'root'
 })
 export class AuthService {
-  private apiUrl = 'http://localhost:8000/api/auth';
+  private apiUrl = 'http://localhost:8000/v1/auth';
   private currentUserSubject = new BehaviorSubject<any>(JSON.parse(localStorage.getItem('currentUser') || '{}'));
   public currentUser = this.currentUserSubject.asObservable();
 

@@ -7,7 +7,7 @@ import { AuthService } from './auth.service';
   providedIn: 'root'
 })
 export class ChatService {
-  private apiUrl = 'http://localhost:8000/api';
+  private apiUrl = 'http://localhost:8000/v1';
 
   constructor(private http: HttpClient, private authService: AuthService) { }
 
@@ -28,7 +28,7 @@ export class ChatService {
   }
 
   sendMessage(conversationId: string, content: string): Observable<any> {
-    return this.http.post(`${this.apiUrl}/messages/send`, {
+    return this.http.post(`${this.apiUrl}/messages`, {
       conversation_id: conversationId,
       content: content,
       message_type: 'text'

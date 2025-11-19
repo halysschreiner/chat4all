@@ -7,7 +7,7 @@
 
 set -e
 
-API_URL="http://localhost:8080"
+API_URL="http://localhost:8000"
 
 echo "================================================"
 echo "  Testando API Chat4All"
@@ -99,7 +99,7 @@ MESSAGE_DATA='{"conversation_id":"33333333-3333-3333-3333-333333333333","content
 MESSAGE_RESPONSE=$(make_request "POST" "/v1/messages" "$MESSAGE_DATA" "$TOKEN")
 echo "$MESSAGE_RESPONSE" | format_json
 
-MESSAGE_ID=$(extract_json_field "$MESSAGE_RESPONSE" ".message.message_id")
+MESSAGE_ID=$(extract_json_field "$MESSAGE_RESPONSE" ".sent_message.message_id")
 
 if [ "$MESSAGE_ID" = "null" ] || [ -z "$MESSAGE_ID" ]; then
     echo -e "${RED}❌ Falha ao enviar mensagem!${NC}"

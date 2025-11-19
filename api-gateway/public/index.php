@@ -43,6 +43,7 @@ $path = parse_url($requestUri, PHP_URL_PATH);
 switch ($path) {
     // ===== HEALTH CHECK =====
     case '/':
+    case '/health':
         echo json_encode([
             'status' => 'ok',
             'service' => 'Chat4All API Gateway',
@@ -53,7 +54,7 @@ switch ($path) {
 
     // ===== AUTH ENDPOINTS =====
     
-    case '/api/auth/register':
+    case '/v1/auth/register':
         if ($requestMethod === 'POST') {
             $data = json_decode(file_get_contents('php://input'), true);
             
@@ -79,7 +80,7 @@ switch ($path) {
         }
         break;
 
-    case '/api/auth/login':
+    case '/v1/auth/login':
         if ($requestMethod === 'POST') {
             $data = json_decode(file_get_contents('php://input'), true);
             
@@ -106,7 +107,7 @@ switch ($path) {
 
     // ===== CONVERSATION ENDPOINTS =====
     
-    case '/api/conversations/private':
+    case '/v1/conversations/private':
         if ($requestMethod === 'POST') {
             $userId = authenticateRequest();
             if (!$userId) break;
@@ -127,7 +128,7 @@ switch ($path) {
         }
         break;
 
-    case '/api/conversations/group':
+    case '/v1/conversations/group':
         if ($requestMethod === 'POST') {
             $userId = authenticateRequest();
             if (!$userId) break;
@@ -152,7 +153,7 @@ switch ($path) {
         }
         break;
 
-    case '/api/conversations':
+    case '/v1/conversations':
         if ($requestMethod === 'GET') {
             $userId = authenticateRequest();
             if (!$userId) break;
@@ -186,7 +187,7 @@ switch ($path) {
 
     // ===== MESSAGE ENDPOINTS =====
     
-    case '/api/messages/send':
+    case '/v1/messages':
         if ($requestMethod === 'POST') {
             $userId = authenticateRequest();
             if (!$userId) break;
@@ -209,7 +210,7 @@ switch ($path) {
         }
         break;
 
-    case (preg_match('/^\/api\/conversations\/(.+)\/messages$/', $path, $matches) ? true : false):
+    case (preg_match('/^\/v1\/conversations\/(.+)\/messages$/', $path, $matches) ? true : false):
         if ($requestMethod === 'GET') {
             $userId = authenticateRequest();
             if (!$userId) break;
@@ -237,7 +238,7 @@ switch ($path) {
         }
         break;
 
-    case '/api/messages/read':
+    case '/v1/messages/read':
         if ($requestMethod === 'POST') {
             $userId = authenticateRequest();
             if (!$userId) break;
