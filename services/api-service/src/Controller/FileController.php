@@ -425,7 +425,7 @@ class FileController
      */
     /**
      * GET /v1/files/{id}/download
-     * Baixar arquivo diretamente (proxy do MinIO)
+     * Baixar arquivo diretamente (proxy do MinIO com streaming)
      */
     public function downloadFile(Request $request, Response $response, array $args): Response
     {
@@ -448,19 +448,28 @@ class FileController
                 return $this->errorResponse($response, 'Sem permissão para acessar este arquivo', 403);
             }
 
-            // Buscar arquivo do MinIO
-            $fileContent = $this->minioService->getObject($fileInfo['storage_path']);
+            $this->logger->info('File download requested', ['file_id' => $fileId, 'file_size' => $fileInfo['file_size']]);
 
-            $this->logger->info('File downloaded', ['file_id' => $fileId]);
+            // Buscar stream do arquivo do MinIO (sem carregar tudo na memória)
+            $stream = $this->minioService->getObjectStream($fileInfo['storage_path']);
 
             // Definir headers para download
             $response = $response
                 ->withHeader('Content-Type', $fileInfo['content_type'])
                 ->withHeader('Content-Disposition', 'attachment; filename="' . $fileInfo['original_filename'] . '"')
                 ->withHeader('Content-Length', (string)$fileInfo['file_size'])
-                ->withHeader('Cache-Control', 'no-cache');
+                ->withHeader('Cache-Control', 'no-cache')
+                ->withHeader('X-Accel-Buffering', 'no'); // Desabilitar buffering do nginx
 
-            $response->getBody()->write($fileContent);
+            // Fazer streaming do arquivo em chunks de 8KB
+            $body = $response->getBody();
+            while (!feof($stream)) {
+                $body->write(fread($stream, 8192));
+            }
+            fclose($stream);
+
+            $this->logger->info('File downloaded successfully', ['file_id' => $fileId]);
+
             return $response;
 
         } catch (\Exception $e) {

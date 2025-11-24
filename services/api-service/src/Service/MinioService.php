@@ -255,6 +255,30 @@ class MinioService
     }
 
     /**
+     * Busca um stream do objeto do bucket (para arquivos grandes)
+     * 
+     * @param string $key Caminho do arquivo no bucket
+     * @return resource Stream do arquivo
+     */
+    public function getObjectStream(string $key)
+    {
+        try {
+            $result = $this->client->getObject([
+                'Bucket' => $this->bucket,
+                'Key' => $key,
+            ]);
+
+            $this->logger->info('Object stream retrieved', ['key' => $key]);
+            
+            // Retornar o stream diretamente (PSR-7 StreamInterface)
+            return $result['Body']->detach();
+        } catch (AwsException $e) {
+            $this->logger->error('Error getting object stream: ' . $e->getMessage());
+            throw new \Exception('Erro ao buscar stream do arquivo: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Deleta um objeto do bucket
      * 
      * @param string $key Caminho do arquivo no bucket

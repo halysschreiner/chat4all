@@ -29,6 +29,9 @@ RUN mkdir -p src && composer install --no-dev --optimize-autoloader --no-interac
 # Copy application code
 COPY services/api-service/ .
 
+# Copy custom php.ini
+COPY services/api-service/php.ini /usr/local/etc/php/conf.d/custom.ini
+
 # Copy start script
 COPY services/api-service/start.sh /app/start.sh
 RUN chmod +x /app/start.sh
