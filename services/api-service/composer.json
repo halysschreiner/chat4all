@@ -12,6 +12,7 @@
         "grpc/grpc": "^1.57",
         "google/protobuf": "^3.25",
         "ramsey/uuid": "^4.7",
+        "aws/aws-sdk-php": "^3.0",
         "ext-rdkafka": "*",
         "ext-pdo": "*",
         "ext-pdo_pgsql": "*"

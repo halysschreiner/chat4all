@@ -1,0 +1,182 @@
+syntax = "proto3";
+
+package file;
+
+// Serviço de Gerenciamento de Arquivos
+service FileService {
+  // Iniciar upload de arquivo (multipart)
+  rpc InitiateUpload(InitiateUploadRequest) returns (InitiateUploadResponse);
+  
+  // Upload de parte do arquivo
+  rpc UploadPart(UploadPartRequest) returns (UploadPartResponse);
+  
+  // Completar upload multipart
+  rpc CompleteUpload(CompleteUploadRequest) returns (CompleteUploadResponse);
+  
+  // Cancelar upload
+  rpc AbortUpload(AbortUploadRequest) returns (AbortUploadResponse);
+  
+  // Obter informações do arquivo
+  rpc GetFileInfo(GetFileInfoRequest) returns (GetFileInfoResponse);
+  
+  // Gerar URL de download temporária
+  rpc GetDownloadUrl(GetDownloadUrlRequest) returns (GetDownloadUrlResponse);
+  
+  // Listar arquivos de uma conversa
+  rpc ListFiles(ListFilesRequest) returns (ListFilesResponse);
+  
+  // Deletar arquivo
+  rpc DeleteFile(DeleteFileRequest) returns (DeleteFileResponse);
+}
+
+// ===== Iniciar Upload =====
+
+message InitiateUploadRequest {
+  string conversation_id = 1;
+  string user_id = 2;
+  string filename = 3;
+  int64 file_size = 4; // Tamanho em bytes
+  string content_type = 5; // MIME type
+  string checksum = 6; // MD5 ou SHA256 (opcional)
+}
+
+message InitiateUploadResponse {
+  bool success = 1;
+  string message = 2;
+  string upload_id = 3; // ID único do upload
+  string file_id = 4; // ID do arquivo no sistema
+  int32 part_size = 5; // Tamanho recomendado para cada parte (em MB)
+  int32 total_parts = 6; // Número total de partes
+}
+
+// ===== Upload de Parte =====
+
+message UploadPartRequest {
+  string upload_id = 1;
+  string file_id = 2;
+  int32 part_number = 3; // Número sequencial da parte (1, 2, 3...)
+  bytes data = 4; // Dados binários da parte
+  string checksum = 5; // Checksum da parte (opcional)
+}
+
+message UploadPartResponse {
+  bool success = 1;
+  string message = 2;
+  string etag = 3; // ETag da parte (para validação)
+  int32 part_number = 4;
+  int64 bytes_uploaded = 5; // Bytes enviados nesta parte
+}
+
+// ===== Completar Upload =====
+
+message CompleteUploadRequest {
+  string upload_id = 1;
+  string file_id = 2;
+  repeated PartInfo parts = 3; // Lista de partes enviadas
+}
+
+message PartInfo {
+  int32 part_number = 1;
+  string etag = 2;
+}
+
+message CompleteUploadResponse {
+  bool success = 1;
+  string message = 2;
+  FileInfo file_info = 3;
+}
+
+// ===== Cancelar Upload =====
+
+message AbortUploadRequest {
+  string upload_id = 1;
+  string file_id = 2;
+}
+
+message AbortUploadResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// ===== Obter Informações do Arquivo =====
+
+message GetFileInfoRequest {
+  string file_id = 1;
+  string user_id = 2; // Para verificar permissão
+}
+
+message GetFileInfoResponse {
+  bool success = 1;
+  string message = 2;
+  FileInfo file_info = 3;
+}
+
+// ===== Gerar URL de Download =====
+
+message GetDownloadUrlRequest {
+  string file_id = 1;
+  string user_id = 2; // Para verificar permissão
+  int32 expiration_seconds = 3; // Tempo de expiração da URL (padrão: 3600)
+}
+
+message GetDownloadUrlResponse {
+  bool success = 1;
+  string message = 2;
+  string download_url = 3; // URL temporária para download
+  int64 expires_at = 4; // Timestamp de expiração
+}
+
+// ===== Listar Arquivos =====
+
+message ListFilesRequest {
+  string conversation_id = 1;
+  string user_id = 2; // Para verificar permissão
+  int32 limit = 3; // Quantidade de arquivos
+  int32 offset = 4; // Paginação
+  string file_type = 5; // Filtro por tipo (opcional): "image", "video", "document", etc.
+}
+
+message ListFilesResponse {
+  bool success = 1;
+  repeated FileInfo files = 2;
+  int32 total_count = 3;
+}
+
+// ===== Deletar Arquivo =====
+
+message DeleteFileRequest {
+  string file_id = 1;
+  string user_id = 2; // Apenas o dono pode deletar
+}
+
+message DeleteFileResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// ===== Tipos de Dados =====
+
+message FileInfo {
+  string file_id = 1;
+  string conversation_id = 2;
+  string user_id = 3; // Quem fez upload
+  string username = 4; // Desnormalizado
+  string filename = 5;
+  string original_filename = 6;
+  int64 file_size = 7; // Tamanho em bytes
+  string content_type = 8; // MIME type
+  string storage_path = 9; // Caminho no object storage
+  string checksum = 10; // Hash do arquivo
+  string status = 11; // "uploading", "completed", "failed"
+  string created_at = 12;
+  string updated_at = 13;
+  FileMetadata metadata = 14; // Metadados adicionais
+}
+
+message FileMetadata {
+  int32 width = 1; // Para imagens
+  int32 height = 2; // Para imagens
+  int32 duration = 3; // Para vídeos/áudios (em segundos)
+  string thumbnail_url = 4; // URL da miniatura (se aplicável)
+  map<string, string> custom = 5; // Metadados customizados
+}

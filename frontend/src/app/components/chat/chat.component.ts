@@ -22,6 +22,11 @@ export class ChatComponent implements OnInit, AfterViewChecked {
   newGroupName = '';
   newGroupMembers = '';
 
+  // File upload
+  selectedFile: File | null = null;
+  isUploading = false;
+  uploadProgress = 0;
+
   @ViewChild('scrollMe') private myScrollContainer!: ElementRef;
 
   constructor(
@@ -75,15 +80,136 @@ export class ChatComponent implements OnInit, AfterViewChecked {
   }
 
   sendMessage() {
-    if (!this.newMessage.trim() || !this.selectedConversation) return;
+    if (!this.selectedConversation) return;
+    if (!this.newMessage.trim() && !this.selectedFile) return;
 
-    this.chatService.sendMessage(this.selectedConversation.conversation_id, this.newMessage)
-      .subscribe(response => {
-        if (response.success) {
-          this.newMessage = '';
-          this.loadMessages(this.selectedConversation.conversation_id);
+    // Se tem arquivo, faz upload primeiro
+    if (this.selectedFile) {
+      this.uploadFile();
+    } else {
+      // Apenas texto
+      this.chatService.sendMessage(this.selectedConversation.conversation_id, this.newMessage)
+        .subscribe(response => {
+          if (response.success) {
+            this.newMessage = '';
+            this.loadMessages(this.selectedConversation.conversation_id);
+          }
+        });
+    }
+  }
+
+  onFileSelected(event: any) {
+    const file = event.target.files[0];
+    if (file) {
+      // Validar tamanho (máximo 2GB)
+      if (file.size > 2 * 1024 * 1024 * 1024) {
+        alert('File too large. Maximum size is 2GB.');
+        return;
+      }
+      this.selectedFile = file;
+    }
+  }
+
+  removeFile() {
+    this.selectedFile = null;
+    this.uploadProgress = 0;
+  }
+
+  formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+  }
+
+  async uploadFile() {
+    if (!this.selectedFile || !this.selectedConversation) return;
+
+    this.isUploading = true;
+    this.uploadProgress = 0;
+
+    try {
+      // 1. Iniciar upload
+      const initResponse = await this.chatService.initiateFileUpload(
+        this.selectedConversation.conversation_id,
+        this.selectedFile.name,
+        this.selectedFile.size,
+        this.selectedFile.type
+      ).toPromise();
+
+      if (!initResponse.success) {
+        throw new Error('Failed to initiate upload');
+      }
+
+      const { upload_id, file_id, part_size, total_parts } = initResponse;
+
+      // 2. Dividir arquivo em partes e fazer upload
+      const partSize = part_size;
+      let uploadedParts = 0;
+
+      for (let i = 0; i < total_parts; i++) {
+        const start = i * partSize;
+        const end = Math.min(start + partSize, this.selectedFile.size);
+        const partBlob = this.selectedFile.slice(start, end);
+
+        // Upload da parte
+        await this.chatService.uploadFilePart(
+          upload_id,
+          file_id,
+          i + 1,
+          partBlob
+        ).toPromise();
+
+        uploadedParts++;
+        this.uploadProgress = Math.round((uploadedParts / total_parts) * 100);
+      }
+
+      // 3. Completar upload
+      const completeResponse = await this.chatService.completeFileUpload(
+        upload_id,
+        file_id
+      ).toPromise();
+
+      if (!completeResponse.success) {
+        throw new Error('Failed to complete upload');
+      }
+
+      // 4. Enviar mensagem com referência ao arquivo
+      const caption = this.newMessage.trim() || `Sent a file: ${this.selectedFile.name}`;
+      await this.chatService.sendMessage(
+        this.selectedConversation.conversation_id,
+        caption,
+        'file',
+        file_id
+      ).toPromise();
+
+      // Limpar estado
+      this.newMessage = '';
+      this.selectedFile = null;
+      this.uploadProgress = 0;
+      this.loadMessages(this.selectedConversation.conversation_id);
+
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('Failed to upload file. Please try again.');
+    } finally {
+      this.isUploading = false;
+    }
+  }
+
+  downloadFile(fileId: string) {
+    this.chatService.getFileDownloadUrl(fileId).subscribe({
+      next: (response) => {
+        if (response.success && response.download_url) {
+          window.open(response.download_url, '_blank');
         }
-      });
+      },
+      error: (error) => {
+        console.error('Download error:', error);
+        alert('Failed to download file.');
+      }
+    });
   }
 
   logout() {

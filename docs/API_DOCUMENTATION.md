@@ -279,6 +279,384 @@ curl -X GET "http://localhost:8080/v1/conversations?limit=20" \
 
 ---
 
+## 📁 Endpoints de Arquivos
+
+### POST /v1/files/upload/initiate
+
+Inicia um upload multipart para arquivos grandes (até 2GB).
+
+**Headers:**
+```
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**Request:**
+
+```bash
+curl -X POST http://localhost:8080/v1/files/upload/initiate \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "conversation_id": "33333333-3333-3333-3333-333333333333",
+    "filename": "documento.pdf",
+    "file_size": 104857600,
+    "content_type": "application/pdf",
+    "checksum": "md5-hash-opcional"
+  }'
+```
+
+**Campos:**
+
+- `conversation_id` (obrigatório): UUID da conversa
+- `filename` (obrigatório): Nome do arquivo
+- `file_size` (obrigatório): Tamanho em bytes (máximo: 2GB)
+- `content_type` (opcional): MIME type (padrão: application/octet-stream)
+- `checksum` (opcional): Hash MD5 ou SHA256 para validação
+
+**Response (200 OK):**
+
+```json
+{
+  "success": true,
+  "message": "Upload iniciado com sucesso",
+  "upload_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "file_id": "f9e8d7c6-b5a4-3210-9876-543210fedcba",
+  "part_size": 5242880,
+  "total_parts": 20,
+  "storage_path": "33333333-3333-3333-3333-333333333333/f9e8d7c6-b5a4-3210-9876-543210fedcba/documento.pdf"
+}
+```
+
+---
+
+### POST /v1/files/upload/part
+
+Faz upload de uma parte do arquivo.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+Content-Type: multipart/form-data
+```
+
+**Form Data:**
+
+- `upload_id`: ID do upload
+- `file_id`: ID do arquivo
+- `part_number`: Número da parte (1, 2, 3...)
+- `data`: Dados binários da parte (arquivo)
+
+**Request:**
+
+```bash
+curl -X POST http://localhost:8080/v1/files/upload/part \
+  -H "Authorization: Bearer <token>" \
+  -F "upload_id=a1b2c3d4-e5f6-7890-abcd-ef1234567890" \
+  -F "file_id=f9e8d7c6-b5a4-3210-9876-543210fedcba" \
+  -F "part_number=1" \
+  -F "data=@parte1.bin"
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "success": true,
+  "message": "Parte enviada com sucesso",
+  "part_number": 1,
+  "etag": "\"d41d8cd98f00b204e9800998ecf8427e\"",
+  "bytes_uploaded": 5242880
+}
+```
+
+---
+
+### POST /v1/files/upload/complete
+
+Completa o upload multipart após enviar todas as partes.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**Request:**
+
+```bash
+curl -X POST http://localhost:8080/v1/files/upload/complete \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "upload_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "file_id": "f9e8d7c6-b5a4-3210-9876-543210fedcba"
+  }'
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "success": true,
+  "message": "Upload completo",
+  "file_info": {
+    "file_id": "f9e8d7c6-b5a4-3210-9876-543210fedcba",
+    "filename": "documento.pdf",
+    "file_size": 104857600,
+    "content_type": "application/pdf",
+    "status": "completed"
+  }
+}
+```
+
+---
+
+### POST /v1/files/upload/abort
+
+Cancela um upload em progresso e limpa recursos alocados.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**Request:**
+
+```bash
+curl -X POST http://localhost:8080/v1/files/upload/abort \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "upload_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "file_id": "f9e8d7c6-b5a4-3210-9876-543210fedcba"
+  }'
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "success": true,
+  "message": "Upload cancelado"
+}
+```
+
+---
+
+### GET /v1/files/{id}
+
+Obtém informações detalhadas sobre um arquivo.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Request:**
+
+```bash
+curl -X GET http://localhost:8080/v1/files/f9e8d7c6-b5a4-3210-9876-543210fedcba \
+  -H "Authorization: Bearer <token>"
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "success": true,
+  "file_info": {
+    "file_id": "f9e8d7c6-b5a4-3210-9876-543210fedcba",
+    "conversation_id": "33333333-3333-3333-3333-333333333333",
+    "user_id": "11111111-1111-1111-1111-111111111111",
+    "username": "alice",
+    "filename": "documento.pdf",
+    "original_filename": "documento.pdf",
+    "file_size": 104857600,
+    "content_type": "application/pdf",
+    "storage_path": "33333333-3333-3333-3333-333333333333/f9e8d7c6-b5a4-3210-9876-543210fedcba/documento.pdf",
+    "status": "completed",
+    "created_at": "2025-01-15 10:30:45",
+    "updated_at": "2025-01-15 10:35:22"
+  }
+}
+```
+
+---
+
+### GET /v1/files/{id}/download
+
+Gera uma URL temporária (pré-assinada) para download do arquivo.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Request:**
+
+```bash
+curl -X GET http://localhost:8080/v1/files/f9e8d7c6-b5a4-3210-9876-543210fedcba/download \
+  -H "Authorization: Bearer <token>"
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "success": true,
+  "download_url": "http://minio:9000/chat4all-files/33333333-3333-3333-3333-333333333333/f9e8d7c6-b5a4-3210-9876-543210fedcba/documento.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=...",
+  "expires_at": 1705323045
+}
+```
+
+**Nota:** A URL gerada é válida por 1 hora (3600 segundos).
+
+---
+
+### GET /v1/conversations/{id}/files
+
+Lista todos os arquivos compartilhados em uma conversa.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Query Parameters:**
+
+- `limit` (opcional): Número de arquivos (padrão: 20, máximo: 100)
+- `offset` (opcional): Offset para paginação (padrão: 0)
+- `file_type` (opcional): Filtro por tipo (image, video, document, etc.)
+
+**Request:**
+
+```bash
+curl -X GET "http://localhost:8080/v1/conversations/33333333-3333-3333-3333-333333333333/files?limit=10&file_type=image" \
+  -H "Authorization: Bearer <token>"
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "success": true,
+  "conversation_id": "33333333-3333-3333-3333-333333333333",
+  "files": [
+    {
+      "file_id": "f9e8d7c6-b5a4-3210-9876-543210fedcba",
+      "filename": "foto.jpg",
+      "file_size": 2048576,
+      "content_type": "image/jpeg",
+      "status": "completed",
+      "user_id": "11111111-1111-1111-1111-111111111111",
+      "username": "alice",
+      "created_at": "2025-01-15 10:30:45"
+    }
+  ],
+  "pagination": {
+    "limit": 10,
+    "offset": 0,
+    "count": 1
+  }
+}
+```
+
+---
+
+### DELETE /v1/files/{id}
+
+Deleta um arquivo. Apenas o dono do arquivo pode deletá-lo.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Request:**
+
+```bash
+curl -X DELETE http://localhost:8080/v1/files/f9e8d7c6-b5a4-3210-9876-543210fedcba \
+  -H "Authorization: Bearer <token>"
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "success": true,
+  "message": "Arquivo deletado com sucesso"
+}
+```
+
+---
+
+## 📤 Exemplo Completo: Upload de Arquivo
+
+```bash
+# 1. Login
+TOKEN=$(curl -s -X POST http://localhost:8080/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"alice@chat4all.com","password":"password123"}' \
+  | jq -r '.token')
+
+# 2. Preparar arquivo para upload
+FILE_PATH="documento.pdf"
+FILE_SIZE=$(stat -f%z "$FILE_PATH")
+PART_SIZE=5242880  # 5MB
+
+# 3. Iniciar upload
+UPLOAD_RESPONSE=$(curl -s -X POST http://localhost:8080/v1/files/upload/initiate \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"conversation_id\": \"33333333-3333-3333-3333-333333333333\",
+    \"filename\": \"documento.pdf\",
+    \"file_size\": $FILE_SIZE,
+    \"content_type\": \"application/pdf\"
+  }")
+
+UPLOAD_ID=$(echo $UPLOAD_RESPONSE | jq -r '.upload_id')
+FILE_ID=$(echo $UPLOAD_RESPONSE | jq -r '.file_id')
+TOTAL_PARTS=$(echo $UPLOAD_RESPONSE | jq -r '.total_parts')
+
+echo "Upload ID: $UPLOAD_ID"
+echo "File ID: $FILE_ID"
+echo "Total Parts: $TOTAL_PARTS"
+
+# 4. Dividir arquivo em partes e fazer upload
+for ((i=1; i<=$TOTAL_PARTS; i++)); do
+  SKIP=$((($i-1) * $PART_SIZE))
+  dd if="$FILE_PATH" of="part_$i.bin" bs=$PART_SIZE skip=$(($SKIP/$PART_SIZE)) count=1 2>/dev/null
+  
+  echo "Uploading part $i/$TOTAL_PARTS..."
+  curl -X POST http://localhost:8080/v1/files/upload/part \
+    -H "Authorization: Bearer $TOKEN" \
+    -F "upload_id=$UPLOAD_ID" \
+    -F "file_id=$FILE_ID" \
+    -F "part_number=$i" \
+    -F "data=@part_$i.bin"
+  
+  rm "part_$i.bin"
+done
+
+# 5. Completar upload
+curl -X POST http://localhost:8080/v1/files/upload/complete \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"upload_id\": \"$UPLOAD_ID\",
+    \"file_id\": \"$FILE_ID\"
+  }" | jq .
+
+# 6. Obter URL de download
+curl -X GET "http://localhost:8080/v1/files/$FILE_ID/download" \
+  -H "Authorization: Bearer $TOKEN" | jq .
+```
+
+---
+
 ## 🏥 Health Check
 
 ### GET /health
@@ -425,24 +803,32 @@ INFO
 ┌─────────────────┐
 │  API Service    │  ← Slim Framework + PHP 8.3
 │  (port 8080)    │
-└────┬────────┬───┘
-     │        │
-     │        └──────────────┐
-     ↓                       ↓
-┌──────────┐         ┌──────────────┐
-│PostgreSQL│         │    Kafka     │
-│(messages)│         │(queue events)│
-└──────────┘         └───────┬──────┘
-                             │
-                             ↓
-                     ┌───────────────┐
-                     │ Router Worker │
-                     │ (consumer)    │
-                     └───────┬───────┘
-                             │
-                             ↓
-                     Updates status
-                     (SENT → DELIVERED)
+└────┬────┬───┬───┘
+     │    │   │
+     │    │   └──────────────┐
+     │    │                  ↓
+     │    │          ┌───────────────┐
+     │    │          │  MinIO (S3)   │
+     │    │          │ Object Storage│
+     │    │          │  (port 9001)  │
+     │    │          └───────────────┘
+     │    │
+     ↓    └──────────────┐
+┌──────────┐            ↓
+│PostgreSQL│     ┌──────────────┐
+│(messages)│     │    Kafka     │
+│ (files)  │     │(queue events)│
+└──────────┘     └───────┬──────┘
+                         │
+                         ↓
+                 ┌───────────────┐
+                 │ Router Worker │
+                 │ (consumer)    │
+                 └───────┬───────┘
+                         │
+                         ↓
+                 Updates status
+                 (SENT → DELIVERED)
 ```
 
 ---
@@ -484,6 +870,37 @@ INFO
 | created_at | TIMESTAMP | Data de criação |
 | delivered_at | TIMESTAMP | Data de entrega |
 | read_at | TIMESTAMP | Data de leitura |
+
+### Tabela: files
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| file_id | UUID | ID único do arquivo |
+| upload_id | UUID | ID do upload multipart |
+| conversation_id | UUID | ID da conversa |
+| user_id | UUID | Usuário que fez upload |
+| filename | VARCHAR(255) | Nome do arquivo sanitizado |
+| original_filename | VARCHAR(255) | Nome original |
+| file_size | BIGINT | Tamanho em bytes |
+| content_type | VARCHAR(100) | MIME type |
+| storage_path | TEXT | Caminho no MinIO |
+| checksum | VARCHAR(64) | Hash MD5/SHA256 |
+| status | VARCHAR(20) | uploading, completed, failed, deleted |
+| minio_upload_id | TEXT | Upload ID do MinIO |
+| total_parts | INT | Total de partes |
+| uploaded_parts | INT | Partes enviadas |
+| created_at | TIMESTAMP | Data de criação |
+| updated_at | TIMESTAMP | Data de atualização |
+
+### Tabela: file_parts
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| file_id | UUID | ID do arquivo |
+| part_number | INT | Número da parte |
+| etag | VARCHAR(255) | ETag do MinIO |
+| bytes_uploaded | BIGINT | Bytes enviados |
+| uploaded_at | TIMESTAMP | Data de upload |
 
 ---
 

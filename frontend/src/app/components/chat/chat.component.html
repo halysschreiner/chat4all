@@ -63,6 +63,14 @@
             {{ msg.from_username || 'Unknown' }}
           </div>
 
+          <div *ngIf="msg.message_type === 'file'" class="file-message">
+            <div class="file-icon">📎</div>
+            <div class="file-info">
+              <div class="file-title">File attached</div>
+              <button (click)="downloadFile(msg.file_id)" class="btn-download">Download</button>
+            </div>
+          </div>
+
           <div class="message-content">
             {{ msg.content }}
           </div>
@@ -76,11 +84,43 @@
       </div>
 
       <div class="message-input">
-        <input type="text" 
-               [(ngModel)]="newMessage" 
-               (keyup.enter)="sendMessage()"
-               placeholder="Type a message...">
-        <button (click)="sendMessage()" class="btn-send">➤</button>
+        <input type="file" 
+               #fileInput 
+               (change)="onFileSelected($event)" 
+               style="display: none;"
+               accept="*/*">
+        
+        <button (click)="fileInput.click()" class="btn-attachment" title="Attach file">
+          📎
+        </button>
+
+        <div class="input-wrapper">
+          <div *ngIf="selectedFile" class="file-preview">
+            <span class="file-name">{{ selectedFile.name }}</span>
+            <span class="file-size">({{ formatFileSize(selectedFile.size) }})</span>
+            <button (click)="removeFile()" class="btn-remove-file">✕</button>
+          </div>
+          
+          <input type="text" 
+                 [(ngModel)]="newMessage" 
+                 (keyup.enter)="sendMessage()"
+                 [placeholder]="selectedFile ? 'Add a caption (optional)...' : 'Type a message...'">
+        </div>
+
+        <button (click)="sendMessage()" 
+                class="btn-send" 
+                [disabled]="isUploading"
+                [class.uploading]="isUploading">
+          <span *ngIf="!isUploading">➤</span>
+          <span *ngIf="isUploading" class="spinner">⟳</span>
+        </button>
+      </div>
+
+      <div *ngIf="uploadProgress > 0 && uploadProgress < 100" class="upload-progress">
+        <div class="progress-bar">
+          <div class="progress-fill" [style.width.%]="uploadProgress"></div>
+        </div>
+        <span class="progress-text">{{ uploadProgress }}%</span>
       </div>
     </div>
   </div>

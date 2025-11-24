@@ -118,6 +118,57 @@ CREATE INDEX idx_audit_logs_user ON audit_logs(user_id);
 CREATE INDEX idx_audit_logs_created ON audit_logs(created_at DESC);
 
 -- ==================================================
+-- TABELA: files
+-- Armazena metadados dos arquivos enviados
+-- ==================================================
+CREATE TABLE IF NOT EXISTS files (
+    file_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    upload_id UUID NOT NULL,
+    conversation_id UUID NOT NULL REFERENCES conversations(conversation_id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(user_id),
+    username VARCHAR(255) NOT NULL,
+    
+    -- Informações do arquivo
+    filename VARCHAR(255) NOT NULL,
+    original_filename VARCHAR(255) NOT NULL,
+    file_size BIGINT NOT NULL,
+    content_type VARCHAR(100) NOT NULL,
+    storage_path TEXT NOT NULL,
+    checksum VARCHAR(64),
+    
+    -- Status do upload
+    status VARCHAR(20) NOT NULL DEFAULT 'uploading' CHECK (status IN ('uploading', 'completed', 'failed', 'aborted', 'deleted')),
+    minio_upload_id TEXT,
+    total_parts INT NOT NULL,
+    uploaded_parts INT NOT NULL DEFAULT 0,
+    
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_files_conversation ON files(conversation_id, created_at DESC);
+CREATE INDEX idx_files_user ON files(user_id, created_at DESC);
+CREATE INDEX idx_files_status ON files(status);
+CREATE INDEX idx_files_upload_id ON files(upload_id);
+
+-- ==================================================
+-- TABELA: file_parts
+-- Armazena informações sobre cada parte do upload
+-- ==================================================
+CREATE TABLE IF NOT EXISTS file_parts (
+    file_id UUID NOT NULL REFERENCES files(file_id) ON DELETE CASCADE,
+    part_number INT NOT NULL,
+    etag VARCHAR(255) NOT NULL,
+    bytes_uploaded BIGINT NOT NULL,
+    uploaded_at TIMESTAMP DEFAULT NOW(),
+    
+    PRIMARY KEY (file_id, part_number)
+);
+
+CREATE INDEX idx_file_parts_file ON file_parts(file_id, part_number);
+
+-- ==================================================
 -- DADOS DE TESTE
 -- Inserir usuários para testes
 -- ==================================================

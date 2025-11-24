@@ -22,7 +22,7 @@ class AuthServiceClient extends \Grpc\BaseStub {
      * @param \Auth\RegisterRequest $argument input argument
      * @param array $metadata metadata
      * @param array $options call options
-     * @return \Grpc\UnaryCall<\Auth\RegisterResponse>
+     * @return \Grpc\UnaryCall
      */
     public function Register(\Auth\RegisterRequest $argument,
       $metadata = [], $options = []) {
@@ -37,7 +37,7 @@ class AuthServiceClient extends \Grpc\BaseStub {
      * @param \Auth\LoginRequest $argument input argument
      * @param array $metadata metadata
      * @param array $options call options
-     * @return \Grpc\UnaryCall<\Auth\LoginResponse>
+     * @return \Grpc\UnaryCall
      */
     public function Login(\Auth\LoginRequest $argument,
       $metadata = [], $options = []) {
@@ -52,7 +52,7 @@ class AuthServiceClient extends \Grpc\BaseStub {
      * @param \Auth\ValidateTokenRequest $argument input argument
      * @param array $metadata metadata
      * @param array $options call options
-     * @return \Grpc\UnaryCall<\Auth\ValidateTokenResponse>
+     * @return \Grpc\UnaryCall
      */
     public function ValidateToken(\Auth\ValidateTokenRequest $argument,
       $metadata = [], $options = []) {
@@ -67,7 +67,7 @@ class AuthServiceClient extends \Grpc\BaseStub {
      * @param \Auth\GetUserRequest $argument input argument
      * @param array $metadata metadata
      * @param array $options call options
-     * @return \Grpc\UnaryCall<\Auth\GetUserResponse>
+     * @return \Grpc\UnaryCall
      */
     public function GetUser(\Auth\GetUserRequest $argument,
       $metadata = [], $options = []) {

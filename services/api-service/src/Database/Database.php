@@ -415,4 +415,209 @@ class Database
         
         return $conversation;
     }
+
+    /**
+     * Inserir metadados do arquivo no banco
+     * Registra: file_id, checksum, tamanho, uploader, conversation_id
+     */
+    public function insertFile(array $data): string
+    {
+        $stmt = $this->pdo->prepare('
+            INSERT INTO files (
+                file_id, upload_id, conversation_id, user_id, username,
+                filename, original_filename, file_size, content_type,
+                storage_path, checksum, status, total_parts, uploaded_parts
+            ) VALUES (
+                :file_id, :upload_id, :conversation_id, :user_id, :username,
+                :filename, :original_filename, :file_size, :content_type,
+                :storage_path, :checksum, :status, :total_parts, :uploaded_parts
+            )
+            RETURNING file_id
+        ');
+
+        $stmt->execute([
+            'file_id' => $data['file_id'],
+            'upload_id' => $data['upload_id'],
+            'conversation_id' => $data['conversation_id'],
+            'user_id' => $data['user_id'],
+            'username' => $data['username'],
+            'filename' => $data['filename'],
+            'original_filename' => $data['original_filename'],
+            'file_size' => $data['file_size'],
+            'content_type' => $data['content_type'],
+            'storage_path' => $data['storage_path'],
+            'checksum' => $data['checksum'] ?? null,
+            'status' => $data['status'] ?? 'uploading',
+            'total_parts' => $data['total_parts'],
+            'uploaded_parts' => $data['uploaded_parts'] ?? 0
+        ]);
+
+        $result = $stmt->fetch();
+        
+        $this->logger->info('File metadata inserted', [
+            'file_id' => $data['file_id'],
+            'size' => $data['file_size'],
+            'uploader' => $data['user_id']
+        ]);
+
+        return $result['file_id'];
+    }
+
+    /**
+     * Atualizar minio_upload_id do arquivo
+     */
+    public function updateFileMinioUploadId(string $fileId, string $minioUploadId): bool
+    {
+        $stmt = $this->pdo->prepare('
+            UPDATE files
+            SET minio_upload_id = :minio_upload_id, updated_at = NOW()
+            WHERE file_id = :file_id
+        ');
+
+        $stmt->execute([
+            'file_id' => $fileId,
+            'minio_upload_id' => $minioUploadId
+        ]);
+
+        return $stmt->rowCount() > 0;
+    }
+
+    /**
+     * Buscar arquivo por ID
+     */
+    public function getFileById(string $fileId): ?array
+    {
+        $stmt = $this->pdo->prepare('
+            SELECT 
+                file_id, upload_id, conversation_id, user_id, username,
+                filename, original_filename, file_size, content_type,
+                storage_path, checksum, status, minio_upload_id,
+                total_parts, uploaded_parts, created_at, updated_at
+            FROM files
+            WHERE file_id = :file_id
+        ');
+        
+        $stmt->execute(['file_id' => $fileId]);
+        $file = $stmt->fetch();
+        
+        return $file ?: null;
+    }
+
+    /**
+     * Inserir informação de parte do arquivo
+     */
+    public function insertFilePart(string $fileId, int $partNumber, string $etag, int $bytesUploaded): void
+    {
+        $stmt = $this->pdo->prepare('
+            INSERT INTO file_parts (file_id, part_number, etag, bytes_uploaded)
+            VALUES (:file_id, :part_number, :etag, :bytes_uploaded)
+            ON CONFLICT (file_id, part_number) DO UPDATE
+            SET etag = EXCLUDED.etag, bytes_uploaded = EXCLUDED.bytes_uploaded
+        ');
+
+        $stmt->execute([
+            'file_id' => $fileId,
+            'part_number' => $partNumber,
+            'etag' => $etag,
+            'bytes_uploaded' => $bytesUploaded
+        ]);
+    }
+
+    /**
+     * Incrementar contador de partes enviadas
+     */
+    public function incrementFileUploadedParts(string $fileId): void
+    {
+        $stmt = $this->pdo->prepare('
+            UPDATE files
+            SET uploaded_parts = uploaded_parts + 1, updated_at = NOW()
+            WHERE file_id = :file_id
+        ');
+
+        $stmt->execute(['file_id' => $fileId]);
+    }
+
+    /**
+     * Buscar partes do arquivo
+     */
+    public function getFileParts(string $fileId): array
+    {
+        $stmt = $this->pdo->prepare('
+            SELECT part_number, etag, bytes_uploaded, uploaded_at
+            FROM file_parts
+            WHERE file_id = :file_id
+            ORDER BY part_number ASC
+        ');
+        
+        $stmt->execute(['file_id' => $fileId]);
+        
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Atualizar status do arquivo
+     */
+    public function updateFileStatus(string $fileId, string $status): bool
+    {
+        $stmt = $this->pdo->prepare('
+            UPDATE files
+            SET status = :status, updated_at = NOW()
+            WHERE file_id = :file_id
+        ');
+
+        $stmt->execute([
+            'file_id' => $fileId,
+            'status' => $status
+        ]);
+
+        $this->logger->info("File $fileId status updated to $status");
+
+        return $stmt->rowCount() > 0;
+    }
+
+    /**
+     * Listar arquivos de uma conversa
+     */
+    public function getFilesByConversation(
+        string $conversationId,
+        int $limit = 20,
+        int $offset = 0,
+        ?string $fileType = null
+    ): array {
+        $sql = '
+            SELECT 
+                file_id, conversation_id, user_id, username,
+                filename, original_filename, file_size, content_type,
+                status, created_at, updated_at
+            FROM files
+            WHERE conversation_id = :conversation_id AND status = \'completed\'
+        ';
+
+        if ($fileType) {
+            $sql .= ' AND content_type LIKE :file_type';
+        }
+
+        $sql .= ' ORDER BY created_at DESC LIMIT :limit OFFSET :offset';
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->bindValue('conversation_id', $conversationId);
+        $stmt->bindValue('limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue('offset', $offset, PDO::PARAM_INT);
+        
+        if ($fileType) {
+            // Mapear tipos genéricos para MIME types
+            $mimeTypeMap = [
+                'image' => 'image/%',
+                'video' => 'video/%',
+                'audio' => 'audio/%',
+                'document' => '%pdf%',
+            ];
+            $mimePattern = $mimeTypeMap[$fileType] ?? $fileType . '%';
+            $stmt->bindValue('file_type', $mimePattern);
+        }
+        
+        $stmt->execute();
+
+        return $stmt->fetchAll();
+    }
 }
