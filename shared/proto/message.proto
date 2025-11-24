@@ -24,6 +24,7 @@ message SendMessageRequest {
   string from_user_id = 2;
   string message_type = 3; // "text", "file", "image"
   string content = 4; // Texto da mensagem ou URL do arquivo
+  string file_id = 5; // ID do arquivo (opcional)
 }
 
 message SendMessageResponse {
@@ -84,6 +85,7 @@ message Message {
   string created_at = 8;
   int32 sequence_number = 9;
   repeated ReadStatus read_by = 10; // Quem leu a mensagem
+  string file_id = 11; // ID do arquivo (opcional)
 }
 
 message ReadStatus {

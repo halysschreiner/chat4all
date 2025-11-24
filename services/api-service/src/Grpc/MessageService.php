@@ -42,6 +42,7 @@ class MessageService
             $fromUserId = $request->getFromUserId();
             $content = $request->getContent();
             $messageType = $request->getMessageType() ?: 'text';
+            $fileId = $request->getFileId() ?: null;
             
             // Create message payload
             $messageId = Uuid::uuid4()->toString();
@@ -53,6 +54,7 @@ class MessageService
                 'from_user_id' => $fromUserId,
                 'content' => $content,
                 'message_type' => $messageType,
+                'file_id' => $fileId,
                 'status' => 'SENT',
                 'created_at' => $timestamp
             ];
@@ -79,6 +81,9 @@ class MessageService
             $msg->setMessageType($messageType);
             $msg->setStatus('SENT');
             $msg->setCreatedAt($timestamp);
+            if ($fileId) {
+                $msg->setFileId($fileId);
+            }
             
             $response->setSentMessage($msg);
             
@@ -116,6 +121,9 @@ class MessageService
                 $msg->setContent($data['content']);
                 $msg->setStatus($data['status']);
                 $msg->setCreatedAt($data['created_at']);
+                if (!empty($data['file_id'])) {
+                    $msg->setFileId($data['file_id']);
+                }
                 
                 $messages[] = $msg;
             }

@@ -87,7 +87,20 @@ export class ChatService {
   }
 
   getFileDownloadUrl(fileId: string): Observable<any> {
-    return this.http.get(`${this.fileApiUrl}/files/${fileId}/download`, { headers: this.getHeaders() });
+    // Usar download direto via backend (não abre nova aba, faz download direto)
+    const url = `${this.fileApiUrl}/files/${fileId}/download`;
+    window.location.href = url; // Força download através do backend
+    return new Observable(observer => {
+      observer.next({ success: true });
+      observer.complete();
+    });
+  }
+
+  downloadFile(fileId: string): Observable<Blob> {
+    return this.http.get(`${this.fileApiUrl}/files/${fileId}/download`, {
+      headers: this.getHeaders(),
+      responseType: 'blob'
+    });
   }
 
   getConversationFiles(conversationId: string, limit: number = 20, offset: number = 0): Observable<any> {

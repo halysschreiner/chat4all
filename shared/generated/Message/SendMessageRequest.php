@@ -33,6 +33,12 @@ class SendMessageRequest extends \Google\Protobuf\Internal\Message
      * Generated from protobuf field <code>string content = 4;</code>
      */
     protected $content = '';
+    /**
+     * ID do arquivo (opcional)
+     *
+     * Generated from protobuf field <code>string file_id = 5;</code>
+     */
+    protected $file_id = '';
 
     /**
      * Constructor.
@@ -46,6 +52,8 @@ class SendMessageRequest extends \Google\Protobuf\Internal\Message
      *           "text", "file", "image"
      *     @type string $content
      *           Texto da mensagem ou URL do arquivo
+     *     @type string $file_id
+     *           ID do arquivo (opcional)
      * }
      */
     public function __construct($data = NULL) {
@@ -145,6 +153,32 @@ class SendMessageRequest extends \Google\Protobuf\Internal\Message
     {
         GPBUtil::checkString($var, True);
         $this->content = $var;
+
+        return $this;
+    }
+
+    /**
+     * ID do arquivo (opcional)
+     *
+     * Generated from protobuf field <code>string file_id = 5;</code>
+     * @return string
+     */
+    public function getFileId()
+    {
+        return $this->file_id;
+    }
+
+    /**
+     * ID do arquivo (opcional)
+     *
+     * Generated from protobuf field <code>string file_id = 5;</code>
+     * @param string $var
+     * @return $this
+     */
+    public function setFileId($var)
+    {
+        GPBUtil::checkString($var, True);
+        $this->file_id = $var;
 
         return $this;
     }

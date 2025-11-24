@@ -75,6 +75,7 @@ export class ChatComponent implements OnInit, AfterViewChecked {
     this.chatService.getMessages(conversationId).subscribe(response => {
       if (response.success) {
         this.messages = response.messages.reverse(); // Show oldest first
+        console.log('Messages loaded:', this.messages);
       }
     });
   }
@@ -199,13 +200,28 @@ export class ChatComponent implements OnInit, AfterViewChecked {
   }
 
   downloadFile(fileId: string) {
-    this.chatService.getFileDownloadUrl(fileId).subscribe({
-      next: (response) => {
-        if (response.success && response.download_url) {
-          window.open(response.download_url, '_blank');
-        }
+    console.log('Download file called with fileId:', fileId);
+    
+    // Usar o serviço HTTP do Angular que já inclui o token
+    const url = `http://localhost:8080/v1/files/${fileId}/download`;
+    
+    this.chatService.downloadFile(fileId).subscribe({
+      next: (blob: Blob) => {
+        // Criar URL temporária para o blob
+        const blobUrl = window.URL.createObjectURL(blob);
+        
+        // Criar link temporário e clicar nele para iniciar download
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = `file_${fileId}`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Limpar URL temporária
+        window.URL.revokeObjectURL(blobUrl);
       },
-      error: (error) => {
+      error: (error: any) => {
         console.error('Download error:', error);
         alert('Failed to download file.');
       }

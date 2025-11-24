@@ -200,6 +200,11 @@ switch ($path) {
             $request->setMessageType($data['message_type'] ?? 'text');
             $request->setContent($data['content'] ?? '');
             
+            // Adicionar file_id se fornecido
+            if (!empty($data['file_id'])) {
+                $request->setFileId($data['file_id']);
+            }
+            
             list($response, $status) = $messageClient->SendMessage($request)->wait();
             
             echo json_encode([
@@ -354,6 +359,7 @@ function formatMessage($msg): ?array
         'from_username' => $msg->getFromUsername(),
         'message_type' => $msg->getMessageType(),
         'content' => $msg->getContent(),
+        'file_id' => $msg->getFileId() ?: null,
         'status' => $msg->getStatus(),
         'created_at' => $msg->getCreatedAt(),
         'sequence_number' => $msg->getSequenceNumber(),

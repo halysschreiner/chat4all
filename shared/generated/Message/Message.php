@@ -59,6 +59,12 @@ class Message extends \Google\Protobuf\Internal\Message
      * Generated from protobuf field <code>repeated .message.ReadStatus read_by = 10;</code>
      */
     private $read_by;
+    /**
+     * ID do arquivo (opcional)
+     *
+     * Generated from protobuf field <code>string file_id = 11;</code>
+     */
+    protected $file_id = '';
 
     /**
      * Constructor.
@@ -79,6 +85,8 @@ class Message extends \Google\Protobuf\Internal\Message
      *     @type int $sequence_number
      *     @type \Message\ReadStatus[]|\Google\Protobuf\Internal\RepeatedField $read_by
      *           Quem leu a mensagem
+     *     @type string $file_id
+     *           ID do arquivo (opcional)
      * }
      */
     public function __construct($data = NULL) {
@@ -314,6 +322,32 @@ class Message extends \Google\Protobuf\Internal\Message
     {
         $arr = GPBUtil::checkRepeatedField($var, \Google\Protobuf\Internal\GPBType::MESSAGE, \Message\ReadStatus::class);
         $this->read_by = $arr;
+
+        return $this;
+    }
+
+    /**
+     * ID do arquivo (opcional)
+     *
+     * Generated from protobuf field <code>string file_id = 11;</code>
+     * @return string
+     */
+    public function getFileId()
+    {
+        return $this->file_id;
+    }
+
+    /**
+     * ID do arquivo (opcional)
+     *
+     * Generated from protobuf field <code>string file_id = 11;</code>
+     * @param string $var
+     * @return $this
+     */
+    public function setFileId($var)
+    {
+        GPBUtil::checkString($var, True);
+        $this->file_id = $var;
 
         return $this;
     }

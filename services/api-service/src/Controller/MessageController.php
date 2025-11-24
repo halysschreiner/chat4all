@@ -57,6 +57,7 @@ class MessageController
             $conversationId = $data['conversation_id'];
             $content = trim($data['content']);
             $messageType = $data['message_type'] ?? 'text';
+            $fileId = $data['file_id'] ?? null;
 
             if (empty($content)) {
                 return $this->errorResponse($response, 'Conteúdo da mensagem não pode ser vazio', 400);
@@ -79,6 +80,7 @@ class MessageController
                 'from_username' => $username,
                 'message_type' => $messageType,
                 'content' => $content,
+                'file_id' => $fileId,
                 'status' => 'SENT',
                 'timestamp' => $timestamp
             ];
@@ -116,6 +118,8 @@ class MessageController
                     'from_user_id' => $userId,
                     'from_username' => $username,
                     'content' => $content,
+                    'message_type' => $messageType,
+                    'file_id' => $fileId,
                     'status' => 'SENT',
                     'created_at' => $timestamp
                 ]

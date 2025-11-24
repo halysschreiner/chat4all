@@ -16,14 +16,15 @@ class Message
         }
         $pool->internalAddGeneratedFile(
             '
-©
+Ë
 
-message.protomessage"j
+message.protomessage"{
 SendMessageRequest
 conversation_id (	
 from_user_id (	
 message_type (	
-content (	"_
+content (	
+file_id (	"_
 SendMessageResponse
 success (
 message (	&
@@ -50,7 +51,7 @@ message_id (	
 status (	"?
 UpdateMessageStatusResponse
 success (
-message (	"í
+message (	"ş
 Message
 
 message_id (	
@@ -64,7 +65,8 @@ message_id (	
 created_at (	
 sequence_number	 ($
 read_by
- (2.message.ReadStatus"@
+ (2.message.ReadStatus
+file_id (	"@
 
 ReadStatus
 user_id (	

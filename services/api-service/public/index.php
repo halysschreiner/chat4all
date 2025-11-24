@@ -92,7 +92,8 @@ $minioService = new MinioService(
     $env['MINIO_SECRET_KEY'],
     $env['MINIO_BUCKET'],
     $env['MINIO_USE_SSL'],
-    $logger
+    $logger,
+    $env['MINIO_PUBLIC_ENDPOINT'] ?? 'localhost:9002'
 );
 
 // Controllers
@@ -195,8 +196,13 @@ $app->get('/v1/files/{id}', function (Request $request, Response $response, arra
     return $fileController->getFileInfo($request, $response, $args);
 })->add($authMiddleware);
 
-// Gerar URL de download
+// Download direto do arquivo
 $app->get('/v1/files/{id}/download', function (Request $request, Response $response, array $args) use ($fileController) {
+    return $fileController->downloadFile($request, $response, $args);
+})->add($authMiddleware);
+
+// Gerar URL temporária de download (alternativo)
+$app->get('/v1/files/{id}/download-url', function (Request $request, Response $response, array $args) use ($fileController) {
     return $fileController->getDownloadUrl($request, $response, $args);
 })->add($authMiddleware);
 

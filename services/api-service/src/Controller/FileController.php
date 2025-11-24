@@ -423,6 +423,56 @@ class FileController
      * GET /v1/files/{id}/download
      * Gera URL temporária para download
      */
+    /**
+     * GET /v1/files/{id}/download
+     * Baixar arquivo diretamente (proxy do MinIO)
+     */
+    public function downloadFile(Request $request, Response $response, array $args): Response
+    {
+        try {
+            $userId = $request->getAttribute('user_id');
+            $fileId = $args['id'];
+
+            $fileInfo = $this->database->getFileById($fileId);
+            
+            if (!$fileInfo) {
+                return $this->errorResponse($response, 'Arquivo não encontrado', 404);
+            }
+
+            if ($fileInfo['status'] !== 'completed') {
+                return $this->errorResponse($response, 'Arquivo ainda não está disponível', 400);
+            }
+
+            // Verificar se usuário tem acesso à conversa
+            if (!$this->database->isUserInConversation($userId, $fileInfo['conversation_id'])) {
+                return $this->errorResponse($response, 'Sem permissão para acessar este arquivo', 403);
+            }
+
+            // Buscar arquivo do MinIO
+            $fileContent = $this->minioService->getObject($fileInfo['storage_path']);
+
+            $this->logger->info('File downloaded', ['file_id' => $fileId]);
+
+            // Definir headers para download
+            $response = $response
+                ->withHeader('Content-Type', $fileInfo['content_type'])
+                ->withHeader('Content-Disposition', 'attachment; filename="' . $fileInfo['original_filename'] . '"')
+                ->withHeader('Content-Length', (string)$fileInfo['file_size'])
+                ->withHeader('Cache-Control', 'no-cache');
+
+            $response->getBody()->write($fileContent);
+            return $response;
+
+        } catch (\Exception $e) {
+            $this->logger->error('Download file error: ' . $e->getMessage());
+            return $this->errorResponse($response, 'Erro ao fazer download do arquivo', 500);
+        }
+    }
+
+    /**
+     * GET /v1/files/{id}/download-url
+     * Gerar URL temporária de download (método alternativo)
+     */
     public function getDownloadUrl(Request $request, Response $response, array $args): Response
     {
         try {

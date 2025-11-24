@@ -15,6 +15,7 @@ class MinioService
     private S3Client $client;
     private string $bucket;
     private Logger $logger;
+    private string $publicEndpoint;
 
     public function __construct(
         string $endpoint,
@@ -22,10 +23,12 @@ class MinioService
         string $secretKey,
         string $bucket,
         bool $useSSL,
-        Logger $logger
+        Logger $logger,
+        ?string $publicEndpoint = null
     ) {
         $this->bucket = $bucket;
         $this->logger = $logger;
+        $this->publicEndpoint = $publicEndpoint ?: $endpoint;
 
         // Criar cliente S3 (MinIO é compatível com S3)
         $this->client = new S3Client([
@@ -211,16 +214,43 @@ class MinioService
             $request = $this->client->createPresignedRequest($cmd, "+{$expirationSeconds} seconds");
             
             $presignedUrl = (string)$request->getUri();
+            
+            // Substituir endpoint interno pelo público
+            $presignedUrl = str_replace('minio:9000', $this->publicEndpoint, $presignedUrl);
 
             $this->logger->info('Presigned URL generated', [
                 'key' => $key,
-                'expires_in' => $expirationSeconds
+                'expires_in' => $expirationSeconds,
+                'url' => $presignedUrl
             ]);
 
             return $presignedUrl;
         } catch (AwsException $e) {
             $this->logger->error('Error generating presigned URL: ' . $e->getMessage());
             throw new \Exception('Erro ao gerar URL de download: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Busca um objeto do bucket
+     * 
+     * @param string $key Caminho do arquivo no bucket
+     * @return string Conteúdo do arquivo
+     */
+    public function getObject(string $key): string
+    {
+        try {
+            $result = $this->client->getObject([
+                'Bucket' => $this->bucket,
+                'Key' => $key,
+            ]);
+
+            $this->logger->info('Object retrieved', ['key' => $key]);
+            
+            return (string)$result['Body'];
+        } catch (AwsException $e) {
+            $this->logger->error('Error getting object: ' . $e->getMessage());
+            throw new \Exception('Erro ao buscar arquivo: ' . $e->getMessage());
         }
     }
 

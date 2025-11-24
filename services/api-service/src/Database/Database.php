@@ -127,10 +127,10 @@ class Database
         $stmt = $this->pdo->prepare('
             INSERT INTO messages (
                 message_id, conversation_id, from_user_id, 
-                message_type, content, status, created_at
+                message_type, content, file_id, status, created_at
             ) VALUES (
                 :message_id, :conversation_id, :from_user_id,
-                :message_type, :content, :status, NOW()
+                :message_type, :content, :file_id, :status, NOW()
             )
             RETURNING message_id
         ');
@@ -141,6 +141,7 @@ class Database
             'from_user_id' => $data['from_user_id'],
             'message_type' => $data['message_type'] ?? 'text',
             'content' => $data['content'],
+            'file_id' => $data['file_id'] ?? null,
             'status' => $data['status'] ?? 'SENT'
         ]);
 
@@ -172,6 +173,7 @@ class Database
                 u.username as from_username,
                 m.message_type,
                 m.content,
+                m.file_id,
                 m.status,
                 m.created_at,
                 m.delivered_at,
