@@ -36,6 +36,27 @@ services:
       timeout: 5s
       retries: 5
 
+  # MinIO - Object Storage para arquivos
+  minio:
+    image: minio/minio:latest
+    container_name: chat4all-minio
+    ports:
+      - "9001:9000"  # API
+      - "9002:9001"  # Console Web
+    environment:
+      MINIO_ROOT_USER: chat4all_admin
+      MINIO_ROOT_PASSWORD: chat4all_minio_pass
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - chat4all-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
   # Zookeeper - Coordenação do Kafka
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
@@ -66,6 +87,8 @@ services:
       MESSAGE_SERVICE_PORT: 50051
       CONVERSATION_SERVICE_HOST: api-service
       CONVERSATION_SERVICE_PORT: 50051
+      API_SERVICE_HOST: api-service
+      API_SERVICE_PORT: 8080
     depends_on:
       - api-service
     networks:
@@ -117,10 +140,17 @@ services:
       KAFKA_BROKERS: kafka:9093
       JWT_SECRET: your-secret-key-change-in-production
       JWT_EXPIRATION: 3600
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: chat4all_admin
+      MINIO_SECRET_KEY: chat4all_minio_pass
+      MINIO_BUCKET: chat4all-files
+      MINIO_USE_SSL: "false"
     depends_on:
       postgres:
         condition: service_healthy
       kafka:
+        condition: service_started
+      minio:
         condition: service_started
     networks:
       - chat4all-network
@@ -148,6 +178,42 @@ services:
     networks:
       - chat4all-network
 
+  # Connector WhatsApp Mock - Simula integração com WhatsApp
+  whatsapp-connector:
+    build:
+      context: .
+      dockerfile: connectors/whatsapp-mock/Dockerfile
+    container_name: whatsapp-connector
+    ports:
+      - "9003:80"
+    environment:
+      KAFKA_BROKER: kafka:9093
+      BACKEND_CALLBACK_URL: http://api-service:8080/v1/callbacks/whatsapp
+      CONNECTOR_PORT: 80
+    depends_on:
+      kafka:
+        condition: service_started
+    networks:
+      - chat4all-network
+
+  # Connector Instagram Mock - Simula integração com Instagram
+  instagram-connector:
+    build:
+      context: .
+      dockerfile: connectors/instagram-mock/Dockerfile
+    container_name: instagram-connector
+    ports:
+      - "9004:80"
+    environment:
+      KAFKA_BROKER: kafka:9093
+      BACKEND_CALLBACK_URL: http://api-service:8080/v1/callbacks/instagram
+      CONNECTOR_PORT: 80
+    depends_on:
+      kafka:
+        condition: service_started
+    networks:
+      - chat4all-network
+
   # Web Interface - Interface de usuário
   web:
     build:
@@ -155,7 +221,7 @@ services:
       dockerfile: frontend/Dockerfile
     container_name: chat4all-web
     ports:
-      - "9000:80"
+      - "4200:80"
     networks:
       - chat4all-network
 
@@ -166,3 +232,4 @@ networks:
 volumes:
   postgres_data:
   redis_data:
+  minio_data:

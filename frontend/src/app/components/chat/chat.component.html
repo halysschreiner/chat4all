@@ -3,7 +3,7 @@
   <div class="sidebar">
     <div class="sidebar-header">
       <div class="user-info">
-        <h3>{{ currentUser.username }}</h3>
+        <h3>{{ currentUser?.user?.username || currentUser?.username }}</h3>
         <button (click)="logout()" class="btn-icon" title="Logout">
           <i class="icon">🚪</i>
         </button>
@@ -56,11 +56,19 @@
       <div class="messages-list" #scrollMe>
         <div *ngFor="let msg of messages" 
              class="message-bubble" 
-             [class.sent]="msg.from_user_id === currentUser.user_id"
-             [class.received]="msg.from_user_id !== currentUser.user_id">
+             [class.sent]="msg.from_user_id === (currentUser?.user?.user_id || currentUser?.user_id)"
+             [class.received]="msg.from_user_id !== (currentUser?.user?.user_id || currentUser?.user_id)">
           
-          <div *ngIf="selectedConversation.type === 'group' && msg.from_user_id !== currentUser.user_id" class="message-sender">
+          <div *ngIf="selectedConversation.type === 'group' && msg.from_user_id !== (currentUser?.user?.user_id || currentUser?.user_id)" class="message-sender">
             {{ msg.from_username || 'Unknown' }}
+          </div>
+
+          <div *ngIf="msg.message_type === 'file'" class="file-message">
+            <div class="file-icon">📎</div>
+            <div class="file-info">
+              <div class="file-title">File attached</div>
+              <button (click)="downloadFile(msg.file_id)" class="btn-download">Download</button>
+            </div>
           </div>
 
           <div class="message-content">
@@ -68,19 +76,56 @@
           </div>
           <div class="message-meta">
             <span class="time">{{ msg.created_at | date:'shortTime' }}</span>
-            <span *ngIf="msg.from_user_id === currentUser.user_id" class="status-icon" [class.read]="msg.status === 'READ'">
-              {{ msg.status === 'READ' ? '✓✓' : (msg.status === 'DELIVERED' ? '✓✓' : '✓') }}
+            <span *ngIf="msg.from_user_id === (currentUser?.user?.user_id || currentUser?.user_id)" class="status-icon" 
+                  [class.sent]="msg.status === 'SENT'"
+                  [class.delivered]="msg.status === 'DELIVERED'"
+                  [class.read]="msg.status === 'READ'">
+              <span *ngIf="msg.status === 'SENT'" class="single-check">✓</span>
+              <span *ngIf="msg.status === 'DELIVERED'" class="double-check">✓✓</span>
+              <span *ngIf="msg.status === 'READ'" class="double-check-blue">✓✓</span>
             </span>
           </div>
         </div>
       </div>
 
       <div class="message-input">
-        <input type="text" 
-               [(ngModel)]="newMessage" 
-               (keyup.enter)="sendMessage()"
-               placeholder="Type a message...">
-        <button (click)="sendMessage()" class="btn-send">➤</button>
+        <input type="file" 
+               #fileInput 
+               (change)="onFileSelected($event)" 
+               style="display: none;"
+               accept="*/*">
+        
+        <button (click)="fileInput.click()" class="btn-attachment" title="Attach file">
+          📎
+        </button>
+
+        <div class="input-wrapper">
+          <div *ngIf="selectedFile" class="file-preview">
+            <span class="file-name">{{ selectedFile.name }}</span>
+            <span class="file-size">({{ formatFileSize(selectedFile.size) }})</span>
+            <button (click)="removeFile()" class="btn-remove-file">✕</button>
+          </div>
+          
+          <input type="text" 
+                 [(ngModel)]="newMessage" 
+                 (keyup.enter)="sendMessage()"
+                 [placeholder]="selectedFile ? 'Add a caption (optional)...' : 'Type a message...'">
+        </div>
+
+        <button (click)="sendMessage()" 
+                class="btn-send" 
+                [disabled]="isUploading"
+                [class.uploading]="isUploading">
+          <span *ngIf="!isUploading">➤</span>
+          <span *ngIf="isUploading" class="spinner">⟳</span>
+        </button>
+      </div>
+
+      <div *ngIf="uploadProgress > 0 && uploadProgress < 100" class="upload-progress">
+        <div class="progress-bar">
+          <div class="progress-fill" [style.width.%]="uploadProgress"></div>
+        </div>
+        <span class="progress-text">{{ uploadProgress }}%</span>
       </div>
     </div>
   </div>

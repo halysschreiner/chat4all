@@ -22,7 +22,7 @@ class ConversationServiceClient extends \Grpc\BaseStub {
      * @param \Conversation\CreatePrivateConversationRequest $argument input argument
      * @param array $metadata metadata
      * @param array $options call options
-     * @return \Grpc\UnaryCall<\Conversation\CreateConversationResponse>
+     * @return \Grpc\UnaryCall
      */
     public function CreatePrivateConversation(\Conversation\CreatePrivateConversationRequest $argument,
       $metadata = [], $options = []) {
@@ -37,7 +37,7 @@ class ConversationServiceClient extends \Grpc\BaseStub {
      * @param \Conversation\CreateGroupRequest $argument input argument
      * @param array $metadata metadata
      * @param array $options call options
-     * @return \Grpc\UnaryCall<\Conversation\CreateConversationResponse>
+     * @return \Grpc\UnaryCall
      */
     public function CreateGroup(\Conversation\CreateGroupRequest $argument,
       $metadata = [], $options = []) {
@@ -52,7 +52,7 @@ class ConversationServiceClient extends \Grpc\BaseStub {
      * @param \Conversation\AddMembersRequest $argument input argument
      * @param array $metadata metadata
      * @param array $options call options
-     * @return \Grpc\UnaryCall<\Conversation\AddMembersResponse>
+     * @return \Grpc\UnaryCall
      */
     public function AddMembers(\Conversation\AddMembersRequest $argument,
       $metadata = [], $options = []) {
@@ -67,7 +67,7 @@ class ConversationServiceClient extends \Grpc\BaseStub {
      * @param \Conversation\ListConversationsRequest $argument input argument
      * @param array $metadata metadata
      * @param array $options call options
-     * @return \Grpc\UnaryCall<\Conversation\ListConversationsResponse>
+     * @return \Grpc\UnaryCall
      */
     public function ListConversations(\Conversation\ListConversationsRequest $argument,
       $metadata = [], $options = []) {
@@ -82,7 +82,7 @@ class ConversationServiceClient extends \Grpc\BaseStub {
      * @param \Conversation\GetConversationRequest $argument input argument
      * @param array $metadata metadata
      * @param array $options call options
-     * @return \Grpc\UnaryCall<\Conversation\GetConversationResponse>
+     * @return \Grpc\UnaryCall
      */
     public function GetConversation(\Conversation\GetConversationRequest $argument,
       $metadata = [], $options = []) {

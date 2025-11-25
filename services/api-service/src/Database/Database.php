@@ -127,10 +127,10 @@ class Database
         $stmt = $this->pdo->prepare('
             INSERT INTO messages (
                 message_id, conversation_id, from_user_id, 
-                message_type, content, status, created_at
+                message_type, content, file_id, status, created_at
             ) VALUES (
                 :message_id, :conversation_id, :from_user_id,
-                :message_type, :content, :status, NOW()
+                :message_type, :content, :file_id, :status, NOW()
             )
             RETURNING message_id
         ');
@@ -141,6 +141,7 @@ class Database
             'from_user_id' => $data['from_user_id'],
             'message_type' => $data['message_type'] ?? 'text',
             'content' => $data['content'],
+            'file_id' => $data['file_id'] ?? null,
             'status' => $data['status'] ?? 'SENT'
         ]);
 
@@ -172,6 +173,7 @@ class Database
                 u.username as from_username,
                 m.message_type,
                 m.content,
+                m.file_id,
                 m.status,
                 m.created_at,
                 m.delivered_at,
@@ -217,6 +219,126 @@ class Database
         $this->logger->info("Message $messageId status updated to $status");
 
         return $stmt->rowCount() > 0;
+    }
+
+    /**
+     * Marcar mensagens de uma conversa como lidas pelo usuário
+     */
+    public function markMessagesAsRead(string $conversationId, string $userId): int
+    {
+        $sql = '
+            UPDATE messages 
+            SET status = :status, read_at = NOW(), updated_at = NOW()
+            WHERE conversation_id = :conversation_id 
+            AND from_user_id != :user_id
+            AND status != :read_status
+        ';
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([
+            'conversation_id' => $conversationId,
+            'user_id' => $userId,
+            'status' => 'READ',
+            'read_status' => 'READ'
+        ]);
+
+        $count = $stmt->rowCount();
+        
+        if ($count > 0) {
+            $this->logger->info("Marked $count messages as READ in conversation $conversationId by user $userId");
+        }
+
+        return $count;
+    }
+
+    /**
+     * Marcar mensagens SENT como DELIVERED quando o destinatário as buscar
+     * Atualiza apenas mensagens que:
+     * - Estão em status SENT
+     * - Não foram enviadas pelo usuário que está buscando (o destinatário)
+     */
+    public function markMessagesAsDelivered(string $conversationId, string $recipientUserId): int
+    {
+        $sql = '
+            UPDATE messages 
+            SET status = :status, delivered_at = NOW(), updated_at = NOW()
+            WHERE conversation_id = :conversation_id 
+            AND from_user_id != :recipient_user_id
+            AND status = :sent_status
+        ';
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([
+            'conversation_id' => $conversationId,
+            'recipient_user_id' => $recipientUserId,
+            'status' => 'DELIVERED',
+            'sent_status' => 'SENT'
+        ]);
+
+        $count = $stmt->rowCount();
+        
+        if ($count > 0) {
+            $this->logger->info("Marked $count messages as DELIVERED in conversation $conversationId for recipient $recipientUserId");
+        }
+
+        return $count;
+    }
+
+    /**
+     * Buscar mensagens não lidas de uma conversa para um usuário
+     */
+    public function getUnreadMessages(string $conversationId, string $userId): array
+    {
+        $stmt = $this->pdo->prepare('
+            SELECT 
+                m.message_id,
+                m.conversation_id,
+                m.from_user_id,
+                u.username as sender_username,
+                m.content,
+                m.status,
+                m.file_id,
+                m.created_at,
+                m.delivered_at,
+                m.read_at
+            FROM messages m
+            INNER JOIN users u ON m.from_user_id = u.user_id
+            WHERE m.conversation_id = :conversation_id
+            AND m.from_user_id != :user_id
+            AND m.status != :read_status
+            ORDER BY m.created_at ASC
+        ');
+
+        $stmt->execute([
+            'conversation_id' => $conversationId,
+            'user_id' => $userId,
+            'read_status' => 'READ'
+        ]);
+
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Contar mensagens não lidas de uma conversa para um usuário
+     */
+    public function countUnreadMessages(string $conversationId, string $userId): int
+    {
+        $stmt = $this->pdo->prepare('
+            SELECT COUNT(*) as count
+            FROM messages
+            WHERE conversation_id = :conversation_id
+            AND from_user_id != :user_id
+            AND status != :read_status
+        ');
+
+        $stmt->execute([
+            'conversation_id' => $conversationId,
+            'user_id' => $userId,
+            'read_status' => 'READ'
+        ]);
+
+        $result = $stmt->fetch();
+        return (int)$result['count'];
     }
 
     /**
@@ -414,5 +536,210 @@ class Database
         $conversation['members'] = $stmtMembers->fetchAll();
         
         return $conversation;
+    }
+
+    /**
+     * Inserir metadados do arquivo no banco
+     * Registra: file_id, checksum, tamanho, uploader, conversation_id
+     */
+    public function insertFile(array $data): string
+    {
+        $stmt = $this->pdo->prepare('
+            INSERT INTO files (
+                file_id, upload_id, conversation_id, user_id, username,
+                filename, original_filename, file_size, content_type,
+                storage_path, checksum, status, total_parts, uploaded_parts
+            ) VALUES (
+                :file_id, :upload_id, :conversation_id, :user_id, :username,
+                :filename, :original_filename, :file_size, :content_type,
+                :storage_path, :checksum, :status, :total_parts, :uploaded_parts
+            )
+            RETURNING file_id
+        ');
+
+        $stmt->execute([
+            'file_id' => $data['file_id'],
+            'upload_id' => $data['upload_id'],
+            'conversation_id' => $data['conversation_id'],
+            'user_id' => $data['user_id'],
+            'username' => $data['username'],
+            'filename' => $data['filename'],
+            'original_filename' => $data['original_filename'],
+            'file_size' => $data['file_size'],
+            'content_type' => $data['content_type'],
+            'storage_path' => $data['storage_path'],
+            'checksum' => $data['checksum'] ?? null,
+            'status' => $data['status'] ?? 'uploading',
+            'total_parts' => $data['total_parts'],
+            'uploaded_parts' => $data['uploaded_parts'] ?? 0
+        ]);
+
+        $result = $stmt->fetch();
+        
+        $this->logger->info('File metadata inserted', [
+            'file_id' => $data['file_id'],
+            'size' => $data['file_size'],
+            'uploader' => $data['user_id']
+        ]);
+
+        return $result['file_id'];
+    }
+
+    /**
+     * Atualizar minio_upload_id do arquivo
+     */
+    public function updateFileMinioUploadId(string $fileId, string $minioUploadId): bool
+    {
+        $stmt = $this->pdo->prepare('
+            UPDATE files
+            SET minio_upload_id = :minio_upload_id, updated_at = NOW()
+            WHERE file_id = :file_id
+        ');
+
+        $stmt->execute([
+            'file_id' => $fileId,
+            'minio_upload_id' => $minioUploadId
+        ]);
+
+        return $stmt->rowCount() > 0;
+    }
+
+    /**
+     * Buscar arquivo por ID
+     */
+    public function getFileById(string $fileId): ?array
+    {
+        $stmt = $this->pdo->prepare('
+            SELECT 
+                file_id, upload_id, conversation_id, user_id, username,
+                filename, original_filename, file_size, content_type,
+                storage_path, checksum, status, minio_upload_id,
+                total_parts, uploaded_parts, created_at, updated_at
+            FROM files
+            WHERE file_id = :file_id
+        ');
+        
+        $stmt->execute(['file_id' => $fileId]);
+        $file = $stmt->fetch();
+        
+        return $file ?: null;
+    }
+
+    /**
+     * Inserir informação de parte do arquivo
+     */
+    public function insertFilePart(string $fileId, int $partNumber, string $etag, int $bytesUploaded): void
+    {
+        $stmt = $this->pdo->prepare('
+            INSERT INTO file_parts (file_id, part_number, etag, bytes_uploaded)
+            VALUES (:file_id, :part_number, :etag, :bytes_uploaded)
+            ON CONFLICT (file_id, part_number) DO UPDATE
+            SET etag = EXCLUDED.etag, bytes_uploaded = EXCLUDED.bytes_uploaded
+        ');
+
+        $stmt->execute([
+            'file_id' => $fileId,
+            'part_number' => $partNumber,
+            'etag' => $etag,
+            'bytes_uploaded' => $bytesUploaded
+        ]);
+    }
+
+    /**
+     * Incrementar contador de partes enviadas
+     */
+    public function incrementFileUploadedParts(string $fileId): void
+    {
+        $stmt = $this->pdo->prepare('
+            UPDATE files
+            SET uploaded_parts = uploaded_parts + 1, updated_at = NOW()
+            WHERE file_id = :file_id
+        ');
+
+        $stmt->execute(['file_id' => $fileId]);
+    }
+
+    /**
+     * Buscar partes do arquivo
+     */
+    public function getFileParts(string $fileId): array
+    {
+        $stmt = $this->pdo->prepare('
+            SELECT part_number, etag, bytes_uploaded, uploaded_at
+            FROM file_parts
+            WHERE file_id = :file_id
+            ORDER BY part_number ASC
+        ');
+        
+        $stmt->execute(['file_id' => $fileId]);
+        
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Atualizar status do arquivo
+     */
+    public function updateFileStatus(string $fileId, string $status): bool
+    {
+        $stmt = $this->pdo->prepare('
+            UPDATE files
+            SET status = :status, updated_at = NOW()
+            WHERE file_id = :file_id
+        ');
+
+        $stmt->execute([
+            'file_id' => $fileId,
+            'status' => $status
+        ]);
+
+        $this->logger->info("File $fileId status updated to $status");
+
+        return $stmt->rowCount() > 0;
+    }
+
+    /**
+     * Listar arquivos de uma conversa
+     */
+    public function getFilesByConversation(
+        string $conversationId,
+        int $limit = 20,
+        int $offset = 0,
+        ?string $fileType = null
+    ): array {
+        $sql = '
+            SELECT 
+                file_id, conversation_id, user_id, username,
+                filename, original_filename, file_size, content_type,
+                status, created_at, updated_at
+            FROM files
+            WHERE conversation_id = :conversation_id AND status = \'completed\'
+        ';
+
+        if ($fileType) {
+            $sql .= ' AND content_type LIKE :file_type';
+        }
+
+        $sql .= ' ORDER BY created_at DESC LIMIT :limit OFFSET :offset';
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->bindValue('conversation_id', $conversationId);
+        $stmt->bindValue('limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue('offset', $offset, PDO::PARAM_INT);
+        
+        if ($fileType) {
+            // Mapear tipos genéricos para MIME types
+            $mimeTypeMap = [
+                'image' => 'image/%',
+                'video' => 'video/%',
+                'audio' => 'audio/%',
+                'document' => '%pdf%',
+            ];
+            $mimePattern = $mimeTypeMap[$fileType] ?? $fileType . '%';
+            $stmt->bindValue('file_type', $mimePattern);
+        }
+        
+        $stmt->execute();
+
+        return $stmt->fetchAll();
     }
 }

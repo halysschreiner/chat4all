@@ -29,8 +29,16 @@ RUN mkdir -p src && composer install --no-dev --optimize-autoloader --no-interac
 # Copy application code
 COPY services/api-service/ .
 
-# Expose gRPC port
-EXPOSE 50051
+# Copy custom php.ini
+COPY services/api-service/php.ini /usr/local/etc/php/conf.d/custom.ini
 
-# Command to run the gRPC server
-CMD ["php", "src/server.php"]
+# Copy start script
+COPY services/api-service/start.sh /app/start.sh
+RUN chmod +x /app/start.sh
+
+# Expose gRPC port and HTTP port
+EXPOSE 50051
+EXPOSE 8080
+
+# Command to run both servers
+CMD ["/app/start.sh"]

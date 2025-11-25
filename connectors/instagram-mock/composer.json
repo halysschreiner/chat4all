@@ -1,0 +1,17 @@
+{
+    "name": "chat4all/connector-instagram-mock",
+    "description": "Instagram Connector Mock for Chat4All",
+    "type": "project",
+    "require": {
+        "php": "^8.3",
+        "psr/log": "^3.0",
+        "monolog/monolog": "^3.0",
+        "slim/slim": "^4.12",
+        "slim/psr7": "^1.6"
+    },
+    "autoload": {
+        "psr-4": {
+            "Chat4All\\Connector\\Instagram\\": "src/"
+        }
+    }
+}

@@ -22,7 +22,7 @@ class MessageServiceClient extends \Grpc\BaseStub {
      * @param \Message\SendMessageRequest $argument input argument
      * @param array $metadata metadata
      * @param array $options call options
-     * @return \Grpc\UnaryCall<\Message\SendMessageResponse>
+     * @return \Grpc\UnaryCall
      */
     public function SendMessage(\Message\SendMessageRequest $argument,
       $metadata = [], $options = []) {
@@ -37,7 +37,7 @@ class MessageServiceClient extends \Grpc\BaseStub {
      * @param \Message\ListMessagesRequest $argument input argument
      * @param array $metadata metadata
      * @param array $options call options
-     * @return \Grpc\UnaryCall<\Message\ListMessagesResponse>
+     * @return \Grpc\UnaryCall
      */
     public function ListMessages(\Message\ListMessagesRequest $argument,
       $metadata = [], $options = []) {
@@ -52,7 +52,7 @@ class MessageServiceClient extends \Grpc\BaseStub {
      * @param \Message\MarkAsReadRequest $argument input argument
      * @param array $metadata metadata
      * @param array $options call options
-     * @return \Grpc\UnaryCall<\Message\MarkAsReadResponse>
+     * @return \Grpc\UnaryCall
      */
     public function MarkAsRead(\Message\MarkAsReadRequest $argument,
       $metadata = [], $options = []) {
@@ -67,7 +67,7 @@ class MessageServiceClient extends \Grpc\BaseStub {
      * @param \Message\UpdateMessageStatusRequest $argument input argument
      * @param array $metadata metadata
      * @param array $options call options
-     * @return \Grpc\UnaryCall<\Message\UpdateMessageStatusResponse>
+     * @return \Grpc\UnaryCall
      */
     public function UpdateMessageStatus(\Message\UpdateMessageStatusRequest $argument,
       $metadata = [], $options = []) {

@@ -12,8 +12,10 @@ use Slim\Psr7\Response;
 use Chat4All\Api\Middleware\AuthMiddleware;
 use Chat4All\Api\Controller\AuthController;
 use Chat4All\Api\Controller\MessageController;
+use Chat4All\Api\Controller\FileController;
 use Chat4All\Api\Database\Database;
 use Chat4All\Api\Service\KafkaProducer;
+use Chat4All\Api\Service\MinioService;
 use Monolog\Logger;
 use Monolog\Handler\StreamHandler;
 
@@ -30,6 +32,11 @@ $env = [
     'KAFKA_TOPIC_MESSAGES' => getenv('KAFKA_TOPIC_MESSAGES') ?: 'messages',
     'JWT_SECRET' => getenv('JWT_SECRET') ?: 'seu_secret_super_secreto',
     'JWT_EXPIRATION' => getenv('JWT_EXPIRATION') ?: '3600',
+    'MINIO_ENDPOINT' => getenv('MINIO_ENDPOINT') ?: 'localhost:9001',
+    'MINIO_ACCESS_KEY' => getenv('MINIO_ACCESS_KEY') ?: 'chat4all_admin',
+    'MINIO_SECRET_KEY' => getenv('MINIO_SECRET_KEY') ?: 'chat4all_minio_pass',
+    'MINIO_BUCKET' => getenv('MINIO_BUCKET') ?: 'chat4all-files',
+    'MINIO_USE_SSL' => getenv('MINIO_USE_SSL') === 'true',
 ];
 
 // Configurar logger
@@ -79,9 +86,20 @@ $kafkaProducer = new KafkaProducer(
     $logger
 );
 
+$minioService = new MinioService(
+    $env['MINIO_ENDPOINT'],
+    $env['MINIO_ACCESS_KEY'],
+    $env['MINIO_SECRET_KEY'],
+    $env['MINIO_BUCKET'],
+    $env['MINIO_USE_SSL'],
+    $logger,
+    $env['MINIO_PUBLIC_ENDPOINT'] ?? 'localhost:9002'
+);
+
 // Controllers
 $authController = new AuthController($database, $env['JWT_SECRET'], $env['JWT_EXPIRATION'], $logger);
 $messageController = new MessageController($database, $kafkaProducer, $logger);
+$fileController = new FileController($database, $minioService, $logger);
 
 // ==========================================
 // ROTAS PÚBLICAS (sem autenticação)
@@ -147,6 +165,65 @@ $app->get('/v1/conversations/{id}/messages', function (Request $request, Respons
 // Listar conversas do usuário
 $app->get('/v1/conversations', function (Request $request, Response $response) use ($messageController) {
     return $messageController->listConversations($request, $response);
+})->add($authMiddleware);
+
+// Marcar mensagens de uma conversa como lidas
+$app->post('/v1/conversations/{id}/read', function (Request $request, Response $response, array $args) use ($messageController) {
+    return $messageController->markConversationAsRead($request, $response, $args);
+})->add($authMiddleware);
+
+// Obter contagem de mensagens não lidas de uma conversa
+$app->get('/v1/conversations/{id}/unread', function (Request $request, Response $response, array $args) use ($messageController) {
+    return $messageController->getUnreadCount($request, $response, $args);
+})->add($authMiddleware);
+
+// ==========================================
+// ROTAS DE ARQUIVOS (protegidas)
+// ==========================================
+
+// Iniciar upload multipart
+$app->post('/v1/files/upload/initiate', function (Request $request, Response $response) use ($fileController) {
+    return $fileController->initiateUpload($request, $response);
+})->add($authMiddleware);
+
+// Upload de parte
+$app->post('/v1/files/upload/part', function (Request $request, Response $response) use ($fileController) {
+    return $fileController->uploadPart($request, $response);
+})->add($authMiddleware);
+
+// Completar upload
+$app->post('/v1/files/upload/complete', function (Request $request, Response $response) use ($fileController) {
+    return $fileController->completeUpload($request, $response);
+})->add($authMiddleware);
+
+// Cancelar upload
+$app->post('/v1/files/upload/abort', function (Request $request, Response $response) use ($fileController) {
+    return $fileController->abortUpload($request, $response);
+})->add($authMiddleware);
+
+// Obter informações do arquivo
+$app->get('/v1/files/{id}', function (Request $request, Response $response, array $args) use ($fileController) {
+    return $fileController->getFileInfo($request, $response, $args);
+})->add($authMiddleware);
+
+// Download direto do arquivo
+$app->get('/v1/files/{id}/download', function (Request $request, Response $response, array $args) use ($fileController) {
+    return $fileController->downloadFile($request, $response, $args);
+})->add($authMiddleware);
+
+// Gerar URL temporária de download (alternativo)
+$app->get('/v1/files/{id}/download-url', function (Request $request, Response $response, array $args) use ($fileController) {
+    return $fileController->getDownloadUrl($request, $response, $args);
+})->add($authMiddleware);
+
+// Listar arquivos de uma conversa
+$app->get('/v1/conversations/{id}/files', function (Request $request, Response $response, array $args) use ($fileController) {
+    return $fileController->listFiles($request, $response, $args);
+})->add($authMiddleware);
+
+// Deletar arquivo
+$app->delete('/v1/files/{id}', function (Request $request, Response $response, array $args) use ($fileController) {
+    return $fileController->deleteFile($request, $response, $args);
 })->add($authMiddleware);
 
 // ==========================================

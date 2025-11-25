@@ -42,6 +42,7 @@ class MessageService
             $fromUserId = $request->getFromUserId();
             $content = $request->getContent();
             $messageType = $request->getMessageType() ?: 'text';
+            $fileId = $request->getFileId() ?: null;
             
             // Create message payload
             $messageId = Uuid::uuid4()->toString();
@@ -53,6 +54,7 @@ class MessageService
                 'from_user_id' => $fromUserId,
                 'content' => $content,
                 'message_type' => $messageType,
+                'file_id' => $fileId,
                 'status' => 'SENT',
                 'created_at' => $timestamp
             ];
@@ -79,6 +81,9 @@ class MessageService
             $msg->setMessageType($messageType);
             $msg->setStatus('SENT');
             $msg->setCreatedAt($timestamp);
+            if ($fileId) {
+                $msg->setFileId($fileId);
+            }
             
             $response->setSentMessage($msg);
             
@@ -100,8 +105,43 @@ class MessageService
         
         try {
             $conversationId = $request->getConversationId();
+            $userId = $request->getUserId();
             $limit = $request->getLimit() ?: 50;
             $offset = $request->getOffset() ?: 0;
+            
+            $this->logger->info('ListMessages called', [
+                'conversation_id' => $conversationId,
+                'user_id' => $userId,
+                'limit' => $limit,
+                'offset' => $offset
+            ]);
+            
+            // Marcar mensagens SENT como DELIVERED quando o destinatário as buscar
+            // Apenas para mensagens que NÃO foram enviadas pelo usuário atual
+            $deliveredCount = $this->database->markMessagesAsDelivered($conversationId, $userId);
+            
+            if ($deliveredCount > 0) {
+                $this->logger->info('Messages marked as delivered', [
+                    'conversation_id' => $conversationId,
+                    'recipient_user_id' => $userId,
+                    'count' => $deliveredCount
+                ]);
+
+                // Publicar evento no Kafka
+                $event = [
+                    'event_type' => 'messages_delivered',
+                    'conversation_id' => $conversationId,
+                    'recipient_user_id' => $userId,
+                    'count' => $deliveredCount,
+                    'timestamp' => date('Y-m-d H:i:s')
+                ];
+                $this->kafkaProducer->publish($event, $conversationId);
+            } else {
+                $this->logger->info('No messages to mark as delivered', [
+                    'conversation_id' => $conversationId,
+                    'recipient_user_id' => $userId
+                ]);
+            }
             
             $messagesData = $this->database->getMessagesByConversation($conversationId, $limit, $offset);
             
@@ -116,6 +156,9 @@ class MessageService
                 $msg->setContent($data['content']);
                 $msg->setStatus($data['status']);
                 $msg->setCreatedAt($data['created_at']);
+                if (!empty($data['file_id'])) {
+                    $msg->setFileId($data['file_id']);
+                }
                 
                 $messages[] = $msg;
             }

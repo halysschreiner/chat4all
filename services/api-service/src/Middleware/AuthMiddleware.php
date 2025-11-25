@@ -48,14 +48,31 @@ class AuthMiddleware
             // Decodificar e validar token
             $decoded = JWT::decode($token, new Key($this->jwtSecret, 'HS256'));
 
+            // Log para debug
+            $this->logger->info('Token decoded', [
+                'decoded' => (array) $decoded
+            ]);
+
+            // Verificar se user_id existe no token
+            $userId = $decoded->user_id ?? $decoded->sub ?? null;
+            $username = $decoded->username ?? $decoded->name ?? null;
+            $email = $decoded->email ?? null;
+
+            if (!$userId) {
+                $this->logger->error('Token does not contain user_id or sub', [
+                    'token_data' => (array) $decoded
+                ]);
+                return $this->unauthorizedResponse('Token inválido: user_id não encontrado');
+            }
+
             // Adicionar dados do usuário ao request
-            $request = $request->withAttribute('user_id', $decoded->user_id);
-            $request = $request->withAttribute('username', $decoded->username);
-            $request = $request->withAttribute('email', $decoded->email);
+            $request = $request->withAttribute('user_id', $userId);
+            $request = $request->withAttribute('username', $username);
+            $request = $request->withAttribute('email', $email);
 
             $this->logger->info('Request authenticated', [
-                'user_id' => $decoded->user_id,
-                'username' => $decoded->username
+                'user_id' => $userId,
+                'username' => $username
             ]);
 
             // Continuar processamento

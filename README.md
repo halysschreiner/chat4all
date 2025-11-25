@@ -22,6 +22,13 @@ graph TD
         Kafka -->|Consume| RouterWorker[Router Worker]
         RouterWorker -->|Update Status| DB
     end
+    
+    subgraph "Connectors"
+        Kafka -->|whatsapp.messages| WhatsApp[WhatsApp Mock]
+        Kafka -->|instagram.messages| Instagram[Instagram Mock]
+        WhatsApp -.Callbacks.-> APIService
+        Instagram -.Callbacks.-> APIService
+    end
 ```
 
 ### Componentes
@@ -54,7 +61,13 @@ graph TD
     *   Serviço de background que consome mensagens do Kafka.
     *   Simula o roteamento e entrega da mensagem, atualizando o status no banco de dados (de `SENT` para `DELIVERED`).
 
-6.  **PostgreSQL**
+6.  **Connectors (WhatsApp & Instagram Mock)**
+    *   Simulam integrações com APIs externas de mensageria.
+    *   Consomem mensagens de tópicos Kafka específicos (`whatsapp.messages`, `instagram.messages`).
+    *   Simulam envio com delays realistas e retornam callbacks de entrega e leitura.
+    *   Expõem webhooks para receber mensagens simuladas dos canais externos.
+
+7.  **PostgreSQL**
     *   Banco de dados relacional para persistência de usuários, conversas e mensagens.
 
 ---
@@ -79,6 +92,9 @@ chat4all/
 ├── workers/
 │   └── router-worker/    # Worker consumidor do Kafka
 │       └── src/
+├── connectors/           # Conectores com APIs externas (Mock)
+│   ├── whatsapp-mock/   # Simulação WhatsApp Business API
+│   └── instagram-mock/  # Simulação Instagram Direct API
 ├── shared/               # Código compartilhado
 │   ├── proto/            # Definições .proto (Contratos)
 │   └── generated/        # Código PHP gerado pelo protoc
