@@ -263,6 +263,69 @@ switch ($path) {
         }
         break;
 
+    case (preg_match('/^\/v1\/conversations\/(.+)\/read$/', $path, $matches) ? true : false):
+        if ($requestMethod === 'POST') {
+            $userId = authenticateRequest();
+            if (!$userId) break;
+            
+            $conversationId = $matches[1];
+            
+            // Fazer chamada HTTP direta ao api-service pois não existe gRPC para isso
+            $apiServiceUrl = 'http://' . getenv('API_SERVICE_HOST') . ':' . getenv('API_SERVICE_PORT');
+            $url = "{$apiServiceUrl}/v1/conversations/{$conversationId}/read";
+            
+            // Obter token da requisição atual
+            $headers = getallheaders();
+            $authHeader = $headers['Authorization'] ?? '';
+            
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'Authorization: ' . $authHeader,
+                'Content-Type: application/json'
+            ]);
+            
+            $result = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            
+            http_response_code($httpCode);
+            echo $result;
+        }
+        break;
+
+    case (preg_match('/^\/v1\/conversations\/(.+)\/unread$/', $path, $matches) ? true : false):
+        if ($requestMethod === 'GET') {
+            $userId = authenticateRequest();
+            if (!$userId) break;
+            
+            $conversationId = $matches[1];
+            
+            // Fazer chamada HTTP direta ao api-service pois não existe gRPC para isso
+            $apiServiceUrl = 'http://' . getenv('API_SERVICE_HOST') . ':' . getenv('API_SERVICE_PORT');
+            $url = "{$apiServiceUrl}/v1/conversations/{$conversationId}/unread";
+            
+            // Obter token da requisição atual
+            $headers = getallheaders();
+            $authHeader = $headers['Authorization'] ?? '';
+            
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'Authorization: ' . $authHeader,
+                'Content-Type: application/json'
+            ]);
+            
+            $result = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            
+            http_response_code($httpCode);
+            echo $result;
+        }
+        break;
+
     default:
         http_response_code(404);
         echo json_encode(['error' => 'Endpoint não encontrado']);

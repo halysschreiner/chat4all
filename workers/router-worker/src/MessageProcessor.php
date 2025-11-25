@@ -57,34 +57,25 @@ class MessageProcessor
             // Simular delay de processamento (simula envio para canais externos)
             usleep(100000); // 100ms
 
-            // Atualizar status para DELIVERED
-            $updated = $this->database->updateMessageStatus(
+            // NOTA: O status DELIVERED agora é atualizado quando o destinatário
+            // buscar as mensagens (GET /v1/conversations/{id}/messages)
+            // não mais automaticamente pelo worker
+
+            $this->logger->info('Message routed successfully', [
+                'message_id' => $message['message_id']
+            ]);
+
+            // Log de auditoria
+            $this->database->insertAuditLog(
+                'message.routed',
+                'message',
                 $message['message_id'],
-                'DELIVERED',
-                'delivered_at'
+                $message['from_user_id'] ?? null,
+                [
+                    'conversation_id' => $message['conversation_id'],
+                    'processed_by' => 'router-worker'
+                ]
             );
-
-            if ($updated) {
-                $this->logger->info('Message status updated to DELIVERED', [
-                    'message_id' => $message['message_id']
-                ]);
-
-                // Log de auditoria
-                $this->database->insertAuditLog(
-                    'message.delivered',
-                    'message',
-                    $message['message_id'],
-                    $message['from_user_id'] ?? null,
-                    [
-                        'conversation_id' => $message['conversation_id'],
-                        'processed_by' => 'router-worker'
-                    ]
-                );
-            } else {
-                $this->logger->warning('Message not found for status update', [
-                    'message_id' => $message['message_id']
-                ]);
-            }
 
             $this->logger->info('Message processing completed', [
                 'message_id' => $message['message_id']

@@ -3,7 +3,7 @@
   <div class="sidebar">
     <div class="sidebar-header">
       <div class="user-info">
-        <h3>{{ currentUser.username }}</h3>
+        <h3>{{ currentUser?.user?.username || currentUser?.username }}</h3>
         <button (click)="logout()" class="btn-icon" title="Logout">
           <i class="icon">🚪</i>
         </button>
@@ -56,10 +56,10 @@
       <div class="messages-list" #scrollMe>
         <div *ngFor="let msg of messages" 
              class="message-bubble" 
-             [class.sent]="msg.from_user_id === currentUser.user_id"
-             [class.received]="msg.from_user_id !== currentUser.user_id">
+             [class.sent]="msg.from_user_id === (currentUser?.user?.user_id || currentUser?.user_id)"
+             [class.received]="msg.from_user_id !== (currentUser?.user?.user_id || currentUser?.user_id)">
           
-          <div *ngIf="selectedConversation.type === 'group' && msg.from_user_id !== currentUser.user_id" class="message-sender">
+          <div *ngIf="selectedConversation.type === 'group' && msg.from_user_id !== (currentUser?.user?.user_id || currentUser?.user_id)" class="message-sender">
             {{ msg.from_username || 'Unknown' }}
           </div>
 
@@ -76,8 +76,13 @@
           </div>
           <div class="message-meta">
             <span class="time">{{ msg.created_at | date:'shortTime' }}</span>
-            <span *ngIf="msg.from_user_id === currentUser.user_id" class="status-icon" [class.read]="msg.status === 'READ'">
-              {{ msg.status === 'READ' ? '✓✓' : (msg.status === 'DELIVERED' ? '✓✓' : '✓') }}
+            <span *ngIf="msg.from_user_id === (currentUser?.user?.user_id || currentUser?.user_id)" class="status-icon" 
+                  [class.sent]="msg.status === 'SENT'"
+                  [class.delivered]="msg.status === 'DELIVERED'"
+                  [class.read]="msg.status === 'READ'">
+              <span *ngIf="msg.status === 'SENT'" class="single-check">✓</span>
+              <span *ngIf="msg.status === 'DELIVERED'" class="double-check">✓✓</span>
+              <span *ngIf="msg.status === 'READ'" class="double-check-blue">✓✓</span>
             </span>
           </div>
         </div>

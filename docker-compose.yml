@@ -87,6 +87,8 @@ services:
       MESSAGE_SERVICE_PORT: 50051
       CONVERSATION_SERVICE_HOST: api-service
       CONVERSATION_SERVICE_PORT: 50051
+      API_SERVICE_HOST: api-service
+      API_SERVICE_PORT: 8080
     depends_on:
       - api-service
     networks:
@@ -171,6 +173,40 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - chat4all-network
+
+  # Connector WhatsApp Mock - Simula integração com WhatsApp
+  connector-whatsapp:
+    build:
+      context: .
+      dockerfile: connectors/whatsapp-mock/Dockerfile
+    container_name: chat4all-connector-whatsapp
+    ports:
+      - "8081:8081"
+    environment:
+      KAFKA_BROKER: kafka:9093
+      BACKEND_CALLBACK_URL: http://api-service:8080/v1/callbacks/whatsapp
+    depends_on:
+      kafka:
+        condition: service_started
+    networks:
+      - chat4all-network
+
+  # Connector Instagram Mock - Simula integração com Instagram
+  connector-instagram:
+    build:
+      context: .
+      dockerfile: connectors/instagram-mock/Dockerfile
+    container_name: chat4all-connector-instagram
+    ports:
+      - "8082:8082"
+    environment:
+      KAFKA_BROKER: kafka:9093
+      BACKEND_CALLBACK_URL: http://api-service:8080/v1/callbacks/instagram
+    depends_on:
       kafka:
         condition: service_started
     networks:

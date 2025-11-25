@@ -103,8 +103,10 @@ Write-Host "    > gRPC: port 50051" -ForegroundColor DarkGray
 Write-Host "    > HTTP: port 8080 (file uploads enabled)" -ForegroundColor DarkGray
 Write-Host "  - API Gateway (REST to gRPC)" -ForegroundColor Gray
 Write-Host "  - Router Worker (Kafka Consumer)" -ForegroundColor Gray
+Write-Host "  - WhatsApp Connector Mock (Kafka Consumer + HTTP API)" -ForegroundColor Gray
+Write-Host "  - Instagram Connector Mock (Kafka Consumer + HTTP API)" -ForegroundColor Gray
 Write-Host "  - Frontend Web (Angular)" -ForegroundColor Gray
-& $dockerComposeCmd up -d api-service api-gateway router-worker web
+& $dockerComposeCmd up -d api-service api-gateway router-worker connector-whatsapp connector-instagram web
 
 Write-Host ""
 Write-Host "Aguardando servicos da aplicacao ficarem prontos..." -ForegroundColor Yellow
@@ -129,6 +131,12 @@ Write-Host "  API Service gRPC:  " -NoNewline -ForegroundColor White
 Write-Host "localhost:50051" -ForegroundColor Yellow
 Write-Host "  API Service HTTP:  " -NoNewline -ForegroundColor White
 Write-Host "http://localhost:8080" -ForegroundColor Yellow
+Write-Host ""
+Write-Host "Conectores Mock:" -ForegroundColor Cyan
+Write-Host "  WhatsApp Mock:     " -NoNewline -ForegroundColor White
+Write-Host "http://localhost:8081 (health, send, webhook)" -ForegroundColor Yellow
+Write-Host "  Instagram Mock:    " -NoNewline -ForegroundColor White
+Write-Host "http://localhost:8082 (health, send, webhook)" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "Infraestrutura:" -ForegroundColor Cyan
 Write-Host "  PostgreSQL:        " -NoNewline -ForegroundColor White
@@ -157,6 +165,9 @@ Write-Host "$dockerComposeCmd restart <nome-servico>" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "Para testar a API, execute:" -ForegroundColor Cyan
 Write-Host "  .\scripts\test-api.sh" -ForegroundColor Yellow
+Write-Host ""
+Write-Host "Para testar os conectores, execute:" -ForegroundColor Cyan
+Write-Host "  .\scripts\test-connectors.ps1" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "================================================" -ForegroundColor Green
 Write-Host ""

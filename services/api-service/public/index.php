@@ -167,6 +167,16 @@ $app->get('/v1/conversations', function (Request $request, Response $response) u
     return $messageController->listConversations($request, $response);
 })->add($authMiddleware);
 
+// Marcar mensagens de uma conversa como lidas
+$app->post('/v1/conversations/{id}/read', function (Request $request, Response $response, array $args) use ($messageController) {
+    return $messageController->markConversationAsRead($request, $response, $args);
+})->add($authMiddleware);
+
+// Obter contagem de mensagens não lidas de uma conversa
+$app->get('/v1/conversations/{id}/unread', function (Request $request, Response $response, array $args) use ($messageController) {
+    return $messageController->getUnreadCount($request, $response, $args);
+})->add($authMiddleware);
+
 // ==========================================
 // ROTAS DE ARQUIVOS (protegidas)
 // ==========================================

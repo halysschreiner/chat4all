@@ -222,6 +222,126 @@ class Database
     }
 
     /**
+     * Marcar mensagens de uma conversa como lidas pelo usuário
+     */
+    public function markMessagesAsRead(string $conversationId, string $userId): int
+    {
+        $sql = '
+            UPDATE messages 
+            SET status = :status, read_at = NOW(), updated_at = NOW()
+            WHERE conversation_id = :conversation_id 
+            AND from_user_id != :user_id
+            AND status != :read_status
+        ';
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([
+            'conversation_id' => $conversationId,
+            'user_id' => $userId,
+            'status' => 'READ',
+            'read_status' => 'READ'
+        ]);
+
+        $count = $stmt->rowCount();
+        
+        if ($count > 0) {
+            $this->logger->info("Marked $count messages as READ in conversation $conversationId by user $userId");
+        }
+
+        return $count;
+    }
+
+    /**
+     * Marcar mensagens SENT como DELIVERED quando o destinatário as buscar
+     * Atualiza apenas mensagens que:
+     * - Estão em status SENT
+     * - Não foram enviadas pelo usuário que está buscando (o destinatário)
+     */
+    public function markMessagesAsDelivered(string $conversationId, string $recipientUserId): int
+    {
+        $sql = '
+            UPDATE messages 
+            SET status = :status, delivered_at = NOW(), updated_at = NOW()
+            WHERE conversation_id = :conversation_id 
+            AND from_user_id != :recipient_user_id
+            AND status = :sent_status
+        ';
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([
+            'conversation_id' => $conversationId,
+            'recipient_user_id' => $recipientUserId,
+            'status' => 'DELIVERED',
+            'sent_status' => 'SENT'
+        ]);
+
+        $count = $stmt->rowCount();
+        
+        if ($count > 0) {
+            $this->logger->info("Marked $count messages as DELIVERED in conversation $conversationId for recipient $recipientUserId");
+        }
+
+        return $count;
+    }
+
+    /**
+     * Buscar mensagens não lidas de uma conversa para um usuário
+     */
+    public function getUnreadMessages(string $conversationId, string $userId): array
+    {
+        $stmt = $this->pdo->prepare('
+            SELECT 
+                m.message_id,
+                m.conversation_id,
+                m.from_user_id,
+                u.username as sender_username,
+                m.content,
+                m.status,
+                m.file_id,
+                m.created_at,
+                m.delivered_at,
+                m.read_at
+            FROM messages m
+            INNER JOIN users u ON m.from_user_id = u.user_id
+            WHERE m.conversation_id = :conversation_id
+            AND m.from_user_id != :user_id
+            AND m.status != :read_status
+            ORDER BY m.created_at ASC
+        ');
+
+        $stmt->execute([
+            'conversation_id' => $conversationId,
+            'user_id' => $userId,
+            'read_status' => 'READ'
+        ]);
+
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Contar mensagens não lidas de uma conversa para um usuário
+     */
+    public function countUnreadMessages(string $conversationId, string $userId): int
+    {
+        $stmt = $this->pdo->prepare('
+            SELECT COUNT(*) as count
+            FROM messages
+            WHERE conversation_id = :conversation_id
+            AND from_user_id != :user_id
+            AND status != :read_status
+        ');
+
+        $stmt->execute([
+            'conversation_id' => $conversationId,
+            'user_id' => $userId,
+            'read_status' => 'READ'
+        ]);
+
+        $result = $stmt->fetch();
+        return (int)$result['count'];
+    }
+
+    /**
      * Verificar se usuário pertence à conversa
      */
     public function isUserInConversation(string $userId, string $conversationId): bool

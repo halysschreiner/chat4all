@@ -119,4 +119,12 @@ export class ChatService {
       member_user_ids: memberUserIds
     }, { headers: this.getHeaders() });
   }
+
+  markConversationAsRead(conversationId: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/conversations/${conversationId}/read`, {}, { headers: this.getHeaders() });
+  }
+
+  getUnreadCount(conversationId: string): Observable<any> {
+    return this.http.get(`${this.apiUrl}/conversations/${conversationId}/unread`, { headers: this.getHeaders() });
+  }
 }

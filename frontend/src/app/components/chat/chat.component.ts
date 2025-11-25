@@ -69,6 +69,9 @@ export class ChatComponent implements OnInit, AfterViewChecked {
   selectConversation(conversation: any) {
     this.selectedConversation = conversation;
     this.loadMessages(conversation.conversation_id);
+    
+    // Marcar mensagens como lidas quando selecionar a conversa
+    this.markConversationAsRead(conversation.conversation_id);
   }
 
   loadMessages(conversationId: string) {
@@ -76,8 +79,26 @@ export class ChatComponent implements OnInit, AfterViewChecked {
       if (response.success) {
         this.messages = response.messages.reverse(); // Show oldest first
         console.log('Messages loaded:', this.messages);
+        console.log('Current user object:', this.currentUser);
+        console.log('Current user ID:', this.currentUser?.user?.user_id || this.currentUser?.user_id);
+        console.log('First message from_user_id:', this.messages[0]?.from_user_id);
       }
     });
+  }
+
+  markConversationAsRead(conversationId: string) {
+    this.chatService.markConversationAsRead(conversationId).subscribe(
+      response => {
+        if (response.success && response.messages_marked > 0) {
+          console.log(`Marked ${response.messages_marked} messages as read`);
+          // Recarregar conversas para atualizar contador de não lidas
+          this.loadConversations();
+        }
+      },
+      error => {
+        console.error('Error marking messages as read:', error);
+      }
+    );
   }
 
   sendMessage() {
