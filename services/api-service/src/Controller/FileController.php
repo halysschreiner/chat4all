@@ -190,19 +190,30 @@ class FileController
                 return $this->errorResponse($response, 'Upload não está em progresso', 400);
             }
 
-            // Pegar arquivo enviado
-            if (!isset($uploadedFiles['data'])) {
+            // Pegar arquivo enviado - suporta multipart ou base64 JSON
+            $partData = null;
+            
+            // Verificar se foi enviado via multipart
+            if (isset($uploadedFiles['data'])) {
+                $uploadedFile = $uploadedFiles['data'];
+                
+                if ($uploadedFile->getError() !== UPLOAD_ERR_OK) {
+                    return $this->errorResponse($response, 'Erro ao receber arquivo', 400);
+                }
+                
+                $partData = $uploadedFile->getStream()->getContents();
+            }
+            // Verificar se foi enviado via JSON base64
+            elseif (isset($params['data'])) {
+                $partData = base64_decode($params['data']);
+                if ($partData === false) {
+                    return $this->errorResponse($response, 'Dados base64 inválidos', 400);
+                }
+            }
+            else {
                 return $this->errorResponse($response, 'Dados da parte não encontrados', 400);
             }
 
-            $uploadedFile = $uploadedFiles['data'];
-            
-            if ($uploadedFile->getError() !== UPLOAD_ERR_OK) {
-                return $this->errorResponse($response, 'Erro ao receber arquivo', 400);
-            }
-
-            // Fazer upload da parte para o MinIO
-            $partData = $uploadedFile->getStream()->getContents();
             $bytesUploaded = strlen($partData);
             
             $etag = $this->minioService->uploadPart(

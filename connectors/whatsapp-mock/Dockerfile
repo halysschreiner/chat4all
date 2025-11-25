@@ -26,4 +26,7 @@ COPY connectors/whatsapp-mock/ .
 # Tornar script de inicialização executável
 RUN chmod +x /app/start.sh
 
+# Expor porta padrão
+EXPOSE 80
+
 CMD ["/app/start.sh"]

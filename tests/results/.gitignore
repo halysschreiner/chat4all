@@ -1,0 +1,7 @@
+# Ignorar resultados de testes
+*.txt
+*.tmp
+*.log
+test-file.txt
+downloaded-*
+part*.tmp

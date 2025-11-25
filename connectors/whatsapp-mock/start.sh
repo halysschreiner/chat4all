@@ -2,10 +2,13 @@
 
 echo "🟢 Starting WhatsApp Mock Connector..."
 
+# Porta configurável via variável de ambiente
+PORT=${CONNECTOR_PORT:-80}
+
 # Iniciar servidor HTTP em background
-php -S 0.0.0.0:8081 public/index.php &
+php -S 0.0.0.0:$PORT public/index.php &
 HTTP_PID=$!
-echo "✅ HTTP Server started on port 8081 (PID: $HTTP_PID)"
+echo "✅ HTTP Server started on port $PORT (PID: $HTTP_PID)"
 
 # Iniciar consumer Kafka
 echo "✅ Starting Kafka Consumer..."
