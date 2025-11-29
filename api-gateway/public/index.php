@@ -66,6 +66,17 @@ switch ($path) {
             
             list($response, $status) = $authClient->Register($request)->wait();
             
+            // Check if response is null or status indicates error
+            if ($response === null || !$status->code === 0) {
+                http_response_code(500);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Failed to communicate with authentication service',
+                    'error' => $status ? $status->details : 'No response from gRPC server'
+                ]);
+                break;
+            }
+            
             echo json_encode([
                 'success' => $response->getSuccess(),
                 'message' => $response->getMessage(),
@@ -90,6 +101,17 @@ switch ($path) {
             $request->setPassword($data['password'] ?? '');
             
             list($response, $status) = $authClient->Login($request)->wait();
+            
+            // Check if response is null or status indicates error
+            if ($response === null || !$status->code === 0) {
+                http_response_code(500);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Failed to communicate with authentication service',
+                    'error' => $status ? $status->details : 'No response from gRPC server'
+                ]);
+                break;
+            }
             
             echo json_encode([
                 'success' => $response->getSuccess(),

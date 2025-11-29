@@ -1,0 +1,149 @@
+{
+    "metrics": {
+        "http_req_blocked": {
+            "max": 23.816395,
+            "p(90)": 0.00534,
+            "p(95)": 0.006282,
+            "avg": 0.00636930080479124,
+            "min": 0,
+            "med": 0.003777
+        },
+        "http_req_sending": {
+            "p(95)": 0.040157,
+            "avg": -0.07749228376614127,
+            "min": -23475.409735,
+            "med": 0.012614,
+            "max": 23476.279917,
+            "p(90)": 0.022463
+        },
+        "data_received": {
+            "count": 675295552,
+            "rate": 1406896.9426425223
+        },
+        "http_req_duration{expected_response:true}": {
+            "p(90)": 44.63682,
+            "p(95)": 53.5420819999999,
+            "avg": 159.66818491126782,
+            "min": -23555.158332,
+            "med": 23.1410225,
+            "max": 23639.323285
+        },
+        "http_req_connecting": {
+            "p(95)": 0,
+            "avg": 0.0003926780319685049,
+            "min": 0,
+            "med": 0,
+            "max": 7.760219,
+            "p(90)": 0
+        },
+        "messages_success": {
+            "count": 0,
+            "rate": 0,
+            "thresholds": {
+                "count>1000": true
+            }
+        },
+        "http_req_receiving": {
+            "avg": -0.00896111347347838,
+            "min": -23557.207855,
+            "med": 0.040196,
+            "max": 23508.737502,
+            "p(90)": 0.097745,
+            "p(95)": 0.156068
+        },
+        "vus": {
+            "max": 200,
+            "value": 1,
+            "min": 1
+        },
+        "iterations": {
+            "count": 1182663,
+            "rate": 2463.9359076904348
+        },
+        "checks": {
+            "passes": 1182663,
+            "fails": 1182663,
+            "value": 0.5
+        },
+        "iteration_duration": {
+            "avg": 39.603541006524026,
+            "min": 1.010534,
+            "med": 25.388535,
+            "max": 2658.888494,
+            "p(90)": 93.71744900000002,
+            "p(95)": 136.13964799999994
+        },
+        "vus_max": {
+            "value": 200,
+            "min": 200,
+            "max": 200
+        },
+        "data_sent": {
+            "count": 344101618,
+            "rate": 716894.2737572558
+        },
+        "http_req_duration": {
+            "avg": 159.66818491126782,
+            "min": -23555.158332,
+            "med": 23.1410225,
+            "max": 23639.323285,
+            "p(90)": 44.63682,
+            "p(95)": 53.5420819999999,
+            "thresholds": {
+                "p(95)<500": false,
+                "p(99)<1000": false
+            }
+        },
+        "http_req_waiting": {
+            "p(95)": 53.444322349999986,
+            "avg": 159.7546383085063,
+            "min": 0,
+            "med": 23.054645,
+            "max": 23639.220235,
+            "p(90)": 44.54156029999999
+        },
+        "http_req_tls_handshaking": {
+            "avg": 0,
+            "min": 0,
+            "med": 0,
+            "max": 0,
+            "p(90)": 0,
+            "p(95)": 0
+        },
+        "http_req_failed": {
+            "passes": 0,
+            "fails": 1182664,
+            "thresholds": {
+                "rate<0.05": false
+            },
+            "value": 0
+        },
+        "http_reqs": {
+            "count": 1182664,
+            "rate": 2463.937991069984
+        }
+    },
+    "setup_data": {},
+    "root_group": {
+            "name": "",
+            "path": "",
+            "id": "d41d8cd98f00b204e9800998ecf8427e",
+            "groups": {},
+            "checks": {
+                    "registration successful": {
+                        "passes": 1182663,
+                        "fails": 0,
+                        "name": "registration successful",
+                        "path": "::registration successful",
+                        "id": "fbc1c008d0d938073241c2301ecb153b"
+                    },
+                    "user_id present": {
+                        "name": "user_id present",
+                        "path": "::user_id present",
+                        "id": "268f168df638545abf28125c8c50c456",
+                        "passes": 0,
+                        "fails": 1182663
+                    }
+                }
+        }
+}

@@ -1,0 +1,90 @@
+{
+	"dashboard": {
+		"title": "Chat4All - Resource Usage",
+		"tags": [
+			"chat4all",
+			"resources"
+		],
+		"timezone": "browser",
+		"panels": [
+			{
+				"id": 1,
+				"gridPos": {
+					"h": 8,
+					"w": 12,
+					"x": 0,
+					"y": 0
+				},
+				"type": "graph",
+				"title": "CPU Usage (%)",
+				"targets": [
+					{
+						"expr": "cpu_usage_percent",
+						"legendFormat": "{{service}}"
+					}
+				],
+				"yaxes": [
+					{
+						"format": "percent"
+					},
+					{
+						"format": "short"
+					}
+				]
+			},
+			{
+				"id": 2,
+				"gridPos": {
+					"h": 8,
+					"w": 12,
+					"x": 12,
+					"y": 0
+				},
+				"type": "graph",
+				"title": "Memory Usage (MB)",
+				"targets": [
+					{
+						"expr": "memory_usage_mb",
+						"legendFormat": "{{service}}"
+					}
+				],
+				"yaxes": [
+					{
+						"format": "decmbytes"
+					},
+					{
+						"format": "short"
+					}
+				]
+			},
+			{
+				"id": 3,
+				"gridPos": {
+					"h": 8,
+					"w": 24,
+					"x": 0,
+					"y": 8
+				},
+				"type": "graph",
+				"title": "Active Workers",
+				"targets": [
+					{
+						"expr": "active_workers",
+						"legendFormat": "{{service}}"
+					}
+				],
+				"yaxes": [
+					{
+						"format": "short"
+					},
+					{
+						"format": "short"
+					}
+				]
+			}
+		],
+		"schemaVersion": 16,
+		"version": 0,
+		"refresh": "5s"
+	}
+}

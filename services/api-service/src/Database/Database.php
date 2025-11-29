@@ -83,6 +83,22 @@ class Database
     }
 
     /**
+     * Buscar usuário por username
+     */
+    public function getUserByUsername(string $username): ?array
+    {
+        $stmt = $this->pdo->prepare('
+            SELECT user_id, username, email, status
+            FROM users
+            WHERE username = :username AND status = \'active\'
+        ');
+        $stmt->execute(['username' => $username]);
+        
+        $user = $stmt->fetch();
+        return $user ?: null;
+    }
+
+    /**
      * Buscar usuário por email ou telefone
      */
     public function getUserByEmailOrPhone(string $identifier): ?array

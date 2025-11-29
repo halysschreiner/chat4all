@@ -1,0 +1,115 @@
+{
+	"dashboard": {
+		"title": "Chat4All - System Overview",
+		"tags": [
+			"chat4all",
+			"overview"
+		],
+		"timezone": "browser",
+		"panels": [
+			{
+				"id": 1,
+				"gridPos": {
+					"h": 8,
+					"w": 12,
+					"x": 0,
+					"y": 0
+				},
+				"type": "graph",
+				"title": "Messages Processed Total",
+				"targets": [
+					{
+						"expr": "messages_processed_total",
+						"legendFormat": "{{service}}"
+					}
+				],
+				"yaxes": [
+					{
+						"format": "short"
+					},
+					{
+						"format": "short"
+					}
+				]
+			},
+			{
+				"id": 2,
+				"gridPos": {
+					"h": 8,
+					"w": 12,
+					"x": 12,
+					"y": 0
+				},
+				"type": "graph",
+				"title": "Messages Per Second",
+				"targets": [
+					{
+						"expr": "messages_per_second",
+						"legendFormat": "{{service}}"
+					}
+				],
+				"yaxes": [
+					{
+						"format": "short"
+					},
+					{
+						"format": "short"
+					}
+				]
+			},
+			{
+				"id": 3,
+				"gridPos": {
+					"h": 8,
+					"w": 12,
+					"x": 0,
+					"y": 8
+				},
+				"type": "graph",
+				"title": "Latency (ms)",
+				"targets": [
+					{
+						"expr": "latency_ms",
+						"legendFormat": "{{service}} - {{percentile}}"
+					}
+				],
+				"yaxes": [
+					{
+						"format": "ms"
+					},
+					{
+						"format": "short"
+					}
+				]
+			},
+			{
+				"id": 4,
+				"gridPos": {
+					"h": 8,
+					"w": 12,
+					"x": 12,
+					"y": 8
+				},
+				"type": "graph",
+				"title": "Error Rate",
+				"targets": [
+					{
+						"expr": "rate(errors_total[5m])",
+						"legendFormat": "{{service}} - {{type}}"
+					}
+				],
+				"yaxes": [
+					{
+						"format": "short"
+					},
+					{
+						"format": "short"
+					}
+				]
+			}
+		],
+		"schemaVersion": 16,
+		"version": 0,
+		"refresh": "5s"
+	}
+}

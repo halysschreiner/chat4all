@@ -160,7 +160,8 @@ services:
     build:
       context: .
       dockerfile: workers/router-worker/Dockerfile
-    container_name: chat4all-router-worker
+    # container_name: chat4all-router-worker  # Commented to allow scaling
+
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
@@ -183,9 +184,9 @@ services:
     build:
       context: .
       dockerfile: connectors/whatsapp-mock/Dockerfile
-    container_name: whatsapp-connector
-    ports:
-      - "9003:80"
+    # container_name: whatsapp-connector  # Commented to allow scaling
+    # ports:  # Commented to allow scaling - connectors use Kafka internally
+    #   - "9003:80"
     environment:
       KAFKA_BROKER: kafka:9093
       BACKEND_CALLBACK_URL: http://api-service:8080/v1/callbacks/whatsapp
@@ -201,9 +202,9 @@ services:
     build:
       context: .
       dockerfile: connectors/instagram-mock/Dockerfile
-    container_name: instagram-connector
-    ports:
-      - "9004:80"
+    # container_name: instagram-connector  # Commented to allow scaling
+    # ports:  # Commented to allow scaling - connectors use Kafka internally
+    #   - "9004:80"
     environment:
       KAFKA_BROKER: kafka:9093
       BACKEND_CALLBACK_URL: http://api-service:8080/v1/callbacks/instagram
@@ -217,13 +218,68 @@ services:
   # Web Interface - Interface de usuário
   web:
     build:
-      context: .
-      dockerfile: frontend/Dockerfile
+      context: ./frontend
+      dockerfile: Dockerfile
     container_name: chat4all-web
     ports:
       - "4200:80"
+    depends_on:
+      - api-gateway
     networks:
       - chat4all-network
+
+  # ===== MONITORING STACK =====
+  
+  # Prometheus - Metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: chat4all-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - chat4all-network
+    restart: unless-stopped
+
+  # Grafana - Visualization and dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: chat4all-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - chat4all-network
+    restart: unless-stopped
+
+  # Metrics Exporter - Sample metrics generator
+  metrics-exporter:
+    image: python:3.11-slim
+    container_name: chat4all-metrics-exporter
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./monitoring/exporters/metrics-exporter.py:/app/metrics-exporter.py
+    working_dir: /app
+    command: python metrics-exporter.py
+    networks:
+      - chat4all-network
+    restart: unless-stopped
 
 networks:
   chat4all-network:
@@ -233,3 +289,5 @@ volumes:
   postgres_data:
   redis_data:
   minio_data:
+  prometheus-data:
+  grafana-data:

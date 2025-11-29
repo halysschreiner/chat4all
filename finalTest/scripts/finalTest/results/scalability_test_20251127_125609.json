@@ -1,0 +1,66 @@
+[
+{
+    "timestamp": "2025-11-27T12:56:19-03:00",
+    "worker_count": 1,
+    "total_messages": 100,
+    "success_count": 100,
+    "error_count": 0,
+    "duration_seconds": ,
+    "throughput_msg_per_sec": ,
+    "avg_latency_ms": 
+}
+,
+{
+    "timestamp": "2025-11-27T12:56:32-03:00",
+    "worker_count": 2,
+    "total_messages": 200,
+    "success_count": 200,
+    "error_count": 0,
+    "duration_seconds": ,
+    "throughput_msg_per_sec": ,
+    "avg_latency_ms": 
+}
+,
+{
+    "timestamp": "2025-11-27T12:57:11-03:00",
+    "worker_count": 3,
+    "total_messages": 300,
+    "success_count": 300,
+    "error_count": 0,
+    "duration_seconds": ,
+    "throughput_msg_per_sec": ,
+    "avg_latency_ms": 
+}
+,
+{
+    "timestamp": "2025-11-27T12:57:04-03:00",
+    "worker_count": 4,
+    "total_messages": 400,
+    "success_count": 400,
+    "error_count": 0,
+    "duration_seconds": ,
+    "throughput_msg_per_sec": ,
+    "avg_latency_ms": 
+}
+,
+{
+    "timestamp": "2025-11-27T12:57:21-03:00",
+    "worker_count": 5,
+    "total_messages": 500,
+    "success_count": 500,
+    "error_count": 0,
+    "duration_seconds": ,
+    "throughput_msg_per_sec": ,
+    "avg_latency_ms": 
+}
+]
+{
+    "timestamp": "2025-11-27T12:57:47-03:00",
+    "worker_count": 2,
+    "total_messages": 200,
+    "success_count": 200,
+    "error_count": 0,
+    "duration_seconds": ,
+    "throughput_msg_per_sec": ,
+    "avg_latency_ms": 
+}

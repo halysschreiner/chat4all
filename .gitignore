@@ -1,1 +1,4 @@
 TAREFA.md
+
+# Large test result files (k6 full results can be several GB)
+finalTest/results/k6_results_*.json

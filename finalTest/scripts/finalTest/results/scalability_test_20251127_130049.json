@@ -1,0 +1,66 @@
+[
+{
+    "timestamp": "2025-11-27T13:00:59-03:00",
+    "worker_count": 1,
+    "total_messages": 100,
+    "success_count": 100,
+    "error_count": 0,
+    "duration_seconds": 1.381614907,
+    "throughput_msg_per_sec": 72.37,
+    "avg_latency_ms": 10.00
+}
+,
+{
+    "timestamp": "2025-11-27T13:01:12-03:00",
+    "worker_count": 2,
+    "total_messages": 200,
+    "success_count": 200,
+    "error_count": 0,
+    "duration_seconds": 3.022903755,
+    "throughput_msg_per_sec": 66.16,
+    "avg_latency_ms": 10.00
+}
+,
+{
+    "timestamp": "2025-11-27T13:01:26-03:00",
+    "worker_count": 3,
+    "total_messages": 300,
+    "success_count": 300,
+    "error_count": 0,
+    "duration_seconds": 4.395198653,
+    "throughput_msg_per_sec": 68.25,
+    "avg_latency_ms": 10.00
+}
+,
+{
+    "timestamp": "2025-11-27T13:01:42-03:00",
+    "worker_count": 4,
+    "total_messages": 400,
+    "success_count": 400,
+    "error_count": 0,
+    "duration_seconds": 5.862668291,
+    "throughput_msg_per_sec": 68.22,
+    "avg_latency_ms": 10.00
+}
+,
+{
+    "timestamp": "2025-11-27T13:01:59-03:00",
+    "worker_count": 5,
+    "total_messages": 500,
+    "success_count": 500,
+    "error_count": 0,
+    "duration_seconds": 7.325857041,
+    "throughput_msg_per_sec": 68.25,
+    "avg_latency_ms": 10.00
+}
+]
+{
+    "timestamp": "2025-11-27T13:02:25-03:00",
+    "worker_count": 2,
+    "total_messages": 200,
+    "success_count": 200,
+    "error_count": 0,
+    "duration_seconds": 2.917433320,
+    "throughput_msg_per_sec": 68.55,
+    "avg_latency_ms": 10.00
+}

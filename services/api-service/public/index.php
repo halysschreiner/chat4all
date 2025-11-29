@@ -145,6 +145,11 @@ $app->post('/v1/auth/login', function (Request $request, Response $response) use
     return $authController->login($request, $response);
 });
 
+// Registro de novo usuário
+$app->post('/v1/auth/register', function (Request $request, Response $response) use ($authController) {
+    return $authController->register($request, $response);
+});
+
 // ==========================================
 // ROTAS PROTEGIDAS (requerem autenticação)
 // ==========================================

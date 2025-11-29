@@ -1,0 +1,12 @@
+[
+{
+    "timestamp": "2025-11-27T11:48:36-03:00",
+    "worker_count": 1,
+    "total_messages": 100,
+    "success_count": 100,
+    "error_count": 0,
+    "duration_seconds": ,
+    "throughput_msg_per_sec": ,
+    "avg_latency_ms": 
+}
+,

@@ -1,0 +1,33 @@
+# Prometheus Configuration for Chat4All Monitoring
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'chat4all'
+    environment: 'development'
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Chat4All Metrics Exporter - Aggregates all application metrics
+  - job_name: 'chat4all-metrics'
+    static_configs:
+      - targets: ['metrics-exporter:8000']
+        labels:
+          service: 'chat4all'
+          component: 'aggregator'
+
+# Note: The following exporters are disabled by default.
+# To enable them, you need to:
+# 1. Add prometheus client libraries to each service
+# 2. Expose /metrics endpoints on the specified ports
+# 3. Uncomment the configurations below
+
+# Alerting rules (optional)
+# rule_files:
+#   - "alerts.yml"
