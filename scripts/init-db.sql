@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS messages (
     -- Conteúdo
     message_type VARCHAR(20) DEFAULT 'text' CHECK (message_type IN ('text', 'file', 'image', 'video', 'audio')),
     content TEXT NOT NULL,
+    file_id UUID,
     
     -- Status da mensagem
     status VARCHAR(20) DEFAULT 'SENT' CHECK (status IN ('SENT', 'DELIVERED', 'READ', 'FAILED')),
