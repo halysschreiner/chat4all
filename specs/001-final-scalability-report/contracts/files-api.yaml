@@ -1,0 +1,343 @@
+openapi: 3.0.3
+info:
+  title: Chat4All Files API
+  description: |
+    API para upload e download de arquivos no sistema Chat4All.
+    
+    ## Conceitos de Sistemas Distribuídos Demonstrados
+    - **Object Storage**: Armazenamento distribuído via MinIO (S3-compatible)
+    - **Multipart Upload**: Upload em partes para arquivos grandes (até 2GB)
+    - **Presigned URLs**: URLs temporárias para download seguro
+    
+  version: 1.0.0
+  contact:
+    name: UFG - Sistemas Distribuídos
+    
+servers:
+  - url: http://localhost:8000/v1
+    description: API Gateway (desenvolvimento)
+
+paths:
+  /files/upload/initiate:
+    post:
+      summary: Iniciar upload multipart
+      description: |
+        Inicia um upload multipart para arquivos grandes.
+        Retorna upload_id e presigned URLs para cada part.
+        
+        **Conceito SD**: Demonstra divisão de trabalho em chunks
+        para upload resiliente e resumível.
+      tags:
+        - Files
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InitiateUploadRequest'
+      responses:
+        '200':
+          description: Upload iniciado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InitiateUploadResponse'
+        '400':
+          description: Arquivo excede limite de 2GB ou tipo inválido
+        '401':
+          description: Token inválido ou expirado
+
+  /files/upload/{uploadId}/part/{partNumber}:
+    put:
+      summary: Upload de uma parte do arquivo
+      description: |
+        Envia uma parte específica do arquivo.
+        Cada parte deve ter entre 5MB e 100MB (exceto a última).
+      tags:
+        - Files
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: uploadId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: partNumber
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 10000
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: Parte enviada com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartUploadResponse'
+        '400':
+          description: Parte inválida ou fora de ordem
+        '404':
+          description: Upload não encontrado
+
+  /files/upload/{uploadId}/complete:
+    post:
+      summary: Finalizar upload multipart
+      description: |
+        Combina todas as partes e finaliza o upload.
+        Calcula checksum e verifica integridade.
+      tags:
+        - Files
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: uploadId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompleteUploadRequest'
+      responses:
+        '200':
+          description: Upload finalizado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileResponse'
+        '400':
+          description: Partes faltando ou checksum inválido
+        '404':
+          description: Upload não encontrado
+
+  /files/upload/{uploadId}/abort:
+    delete:
+      summary: Cancelar upload multipart
+      description: Cancela um upload em progresso e libera recursos.
+      tags:
+        - Files
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: uploadId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Upload cancelado
+        '404':
+          description: Upload não encontrado
+
+  /files/{fileId}:
+    get:
+      summary: Obter metadados do arquivo
+      tags:
+        - Files
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: fileId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Metadados do arquivo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileResponse'
+        '404':
+          description: Arquivo não encontrado
+
+  /files/{fileId}/download:
+    get:
+      summary: Obter URL de download
+      description: |
+        Gera uma presigned URL para download do arquivo.
+        URL válida por 1 hora (configurável).
+        
+        **Conceito SD**: Presigned URLs permitem acesso direto
+        ao Object Storage sem passar pelo backend.
+      tags:
+        - Files
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: fileId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: expiresIn
+          in: query
+          description: Tempo de validade em segundos (default 3600)
+          schema:
+            type: integer
+            default: 3600
+            minimum: 60
+            maximum: 86400
+      responses:
+        '200':
+          description: URL de download
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadUrlResponse'
+        '404':
+          description: Arquivo não encontrado
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    InitiateUploadRequest:
+      type: object
+      required:
+        - filename
+        - mimeType
+        - size
+      properties:
+        filename:
+          type: string
+          maxLength: 512
+          example: "documento.pdf"
+        mimeType:
+          type: string
+          maxLength: 128
+          example: "application/pdf"
+        size:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 2147483648
+          description: Tamanho em bytes (máximo 2GB)
+          example: 104857600
+        conversationId:
+          type: string
+          format: uuid
+          description: Conversa onde o arquivo será usado (opcional)
+
+    InitiateUploadResponse:
+      type: object
+      properties:
+        fileId:
+          type: string
+          format: uuid
+        uploadId:
+          type: string
+          description: ID do upload multipart no MinIO
+        partSize:
+          type: integer
+          description: Tamanho recomendado de cada parte em bytes
+          example: 104857600
+        totalParts:
+          type: integer
+          description: Número total de partes esperadas
+          example: 10
+        expiresAt:
+          type: string
+          format: date-time
+          description: Quando o upload expira se não finalizado
+
+    PartUploadResponse:
+      type: object
+      properties:
+        partNumber:
+          type: integer
+        etag:
+          type: string
+          description: ETag retornado pelo MinIO
+        uploaded:
+          type: boolean
+
+    CompleteUploadRequest:
+      type: object
+      required:
+        - parts
+      properties:
+        parts:
+          type: array
+          items:
+            type: object
+            properties:
+              partNumber:
+                type: integer
+              etag:
+                type: string
+        checksum:
+          type: string
+          description: SHA-256 do arquivo completo (opcional, para verificação)
+
+    FileResponse:
+      type: object
+      properties:
+        fileId:
+          type: string
+          format: uuid
+        filename:
+          type: string
+        mimeType:
+          type: string
+        size:
+          type: integer
+          format: int64
+        checksum:
+          type: string
+        uploaderId:
+          type: string
+          format: uuid
+        conversationId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, uploading, completed, failed]
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+
+    DownloadUrlResponse:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+          description: Presigned URL para download direto do MinIO
+        expiresAt:
+          type: string
+          format: date-time
+        filename:
+          type: string
+        mimeType:
+          type: string
+        size:
+          type: integer
+          format: int64

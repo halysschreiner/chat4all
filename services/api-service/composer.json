@@ -13,6 +13,9 @@
         "google/protobuf": "^3.25",
         "ramsey/uuid": "^4.7",
         "aws/aws-sdk-php": "^3.0",
+        "cboden/ratchet": "^0.4.4",
+        "react/event-loop": "^1.4",
+        "promphp/prometheus_client_php": "^2.6",
         "ext-rdkafka": "*",
         "ext-pdo": "*",
         "ext-pdo_pgsql": "*"

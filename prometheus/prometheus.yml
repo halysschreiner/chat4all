@@ -1,33 +1,154 @@
+# ================================================
 # Prometheus Configuration for Chat4All Monitoring
+# 
+# CONCEITO DE SISTEMAS DISTRIBUÍDOS:
+# Prometheus coleta métricas de todos os serviços do sistema
+# de forma centralizada, permitindo:
+# - Monitoramento de performance em tempo real
+# - Detecção de anomalias e alertas
+# - Análise histórica e troubleshooting
+# - Planejamento de capacidade
+#
+# Referência: Trabalho Final - Escalabilidade e Relatório (UFG)
+# ================================================
 
 global:
-  scrape_interval: 15s
-  evaluation_interval: 15s
+  scrape_interval: 15s      # Frequência de coleta de métricas
+  evaluation_interval: 15s  # Frequência de avaliação de regras
   external_labels:
     cluster: 'chat4all'
     environment: 'development'
 
-# Scrape configurations
+# Arquivos de regras de alerta
+rule_files:
+  - "alert.rules.yml"
+
+# Configuração do Alertmanager (se disponível)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: ['alertmanager:9093']
+
+# Configuração de scrape para cada serviço
 scrape_configs:
-  # Prometheus itself
+  # ================================================
+  # Prometheus próprio (self-monitoring)
+  # ================================================
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
+    metrics_path: /metrics
 
-  # Chat4All Metrics Exporter - Aggregates all application metrics
-  - job_name: 'chat4all-metrics'
+  # ================================================
+  # API Service - Serviço principal da aplicação
+  # Métricas: HTTP requests, latência, mensagens, arquivos
+  # ================================================
+  - job_name: 'api-service'
     static_configs:
-      - targets: ['metrics-exporter:8000']
+      - targets: ['api-service:8080']
         labels:
-          service: 'chat4all'
-          component: 'aggregator'
+          service: 'api-service'
+          component: 'backend'
+    metrics_path: /metrics
+    scrape_interval: 10s
+    scrape_timeout: 5s
 
-# Note: The following exporters are disabled by default.
-# To enable them, you need to:
-# 1. Add prometheus client libraries to each service
-# 2. Expose /metrics endpoints on the specified ports
-# 3. Uncomment the configurations below
+  # ================================================
+  # WebSocket Worker - Notificações em tempo real
+  # Métricas: conexões ativas, mensagens enviadas
+  # ================================================
+  - job_name: 'websocket-worker'
+    static_configs:
+      - targets: ['websocket-worker:8081']
+        labels:
+          service: 'websocket-worker'
+          component: 'realtime'
+    metrics_path: /metrics
+    scrape_interval: 10s
 
-# Alerting rules (optional)
-# rule_files:
-#   - "alerts.yml"
+  # ================================================
+  # Router Worker - Processamento de mensagens
+  # Métricas: mensagens processadas, latência Kafka
+  # ================================================
+  - job_name: 'router-worker'
+    static_configs:
+      - targets: ['router-worker:9100']
+        labels:
+          service: 'router-worker'
+          component: 'worker'
+    metrics_path: /metrics
+    scrape_interval: 15s
+
+  # ================================================
+  # Kafka Exporter - Métricas do broker Kafka
+  # Métricas: consumer lag, partições, throughput
+  # ================================================
+  - job_name: 'kafka-exporter'
+    static_configs:
+      - targets: ['kafka-exporter:9308']
+        labels:
+          service: 'kafka'
+          component: 'messaging'
+    scrape_interval: 30s
+
+  # ================================================
+  # PostgreSQL Exporter - Métricas do banco de dados
+  # Métricas: conexões, queries, locks, replicação
+  # ================================================
+  - job_name: 'postgres-exporter'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+        labels:
+          service: 'postgres'
+          component: 'database'
+    scrape_interval: 30s
+
+  # ================================================
+  # Redis Exporter - Métricas do cache/pub-sub
+  # Métricas: memory, connections, commands
+  # ================================================
+  - job_name: 'redis-exporter'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+        labels:
+          service: 'redis'
+          component: 'cache'
+    scrape_interval: 15s
+
+  # ================================================
+  # MinIO (S3) Metrics - Métricas do object storage
+  # Métricas: uploads, downloads, storage usage
+  # ================================================
+  - job_name: 'minio'
+    static_configs:
+      - targets: ['minio:9000']
+        labels:
+          service: 'minio'
+          component: 'storage'
+    metrics_path: /minio/v2/metrics/cluster
+    scrape_interval: 30s
+
+  # ================================================
+  # Node Exporter - Métricas de infraestrutura
+  # Métricas: CPU, memória, disco, rede
+  # ================================================
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          service: 'node'
+          component: 'infrastructure'
+    scrape_interval: 30s
+
+  # ================================================
+  # cAdvisor - Métricas de containers Docker
+  # Métricas: CPU, memória, rede por container
+  # ================================================
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+        labels:
+          service: 'cadvisor'
+          component: 'containers'
+    scrape_interval: 15s
+

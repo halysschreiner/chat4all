@@ -1,16 +1,55 @@
-import { Injectable } from '@angular/core';
+import { Injectable, OnDestroy } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, Subject, BehaviorSubject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 import { AuthService } from './auth.service';
+import { WebsocketService, StatusUpdate } from './websocket.service';
+
+export interface Message {
+  message_id: string;
+  conversation_id: string;
+  from_user_id: string;
+  content: string;
+  status?: 'PENDING' | 'SENT' | 'DELIVERED' | 'READ' | 'FAILED';
+  created_at: string;
+  file_id?: string;
+  file?: {
+    filename: string;
+    file_size: number;
+    content_type: string;
+    download_url: string;
+  };
+}
 
 @Injectable({
   providedIn: 'root'
 })
-export class ChatService {
+export class ChatService implements OnDestroy {
   private apiUrl = 'http://localhost:8000/v1';
   private fileApiUrl = 'http://localhost:8080/v1'; // API Service direto para arquivos
+  
+  private destroy$ = new Subject<void>();
+  
+  // Cache de status de mensagens para atualização em tempo real
+  private messageStatuses = new Map<string, BehaviorSubject<string>>();
 
-  constructor(private http: HttpClient, private authService: AuthService) { }
+  constructor(
+    private http: HttpClient, 
+    private authService: AuthService,
+    private websocketService: WebsocketService
+  ) {
+    // Escutar atualizações de status do WebSocket
+    this.websocketService.getStatusUpdates().pipe(
+      takeUntil(this.destroy$)
+    ).subscribe((update: StatusUpdate) => {
+      this.handleStatusUpdate(update);
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
 
   private getHeaders() {
     const user = this.authService.currentUserValue;
@@ -126,5 +165,77 @@ export class ChatService {
 
   getUnreadCount(conversationId: string): Observable<any> {
     return this.http.get(`${this.apiUrl}/conversations/${conversationId}/unread`, { headers: this.getHeaders() });
+  }
+
+  // ==========================================
+  // WebSocket Status Updates Integration
+  // ==========================================
+
+  /**
+   * Handle incoming status update from WebSocket
+   */
+  private handleStatusUpdate(update: StatusUpdate): void {
+    const statusSubject = this.messageStatuses.get(update.message_id);
+    if (statusSubject) {
+      statusSubject.next(update.status);
+    }
+    console.log(`[ChatService] Status update: ${update.message_id} -> ${update.status}`);
+  }
+
+  /**
+   * Subscribe to status updates for a specific message
+   */
+  getMessageStatusObservable(messageId: string): Observable<string> {
+    if (!this.messageStatuses.has(messageId)) {
+      this.messageStatuses.set(messageId, new BehaviorSubject<string>('PENDING'));
+    }
+    return this.messageStatuses.get(messageId)!.asObservable();
+  }
+
+  /**
+   * Initialize message status tracking
+   */
+  initializeMessageStatus(messageId: string, initialStatus: string = 'PENDING'): void {
+    if (!this.messageStatuses.has(messageId)) {
+      this.messageStatuses.set(messageId, new BehaviorSubject<string>(initialStatus));
+    } else {
+      this.messageStatuses.get(messageId)!.next(initialStatus);
+    }
+  }
+
+  /**
+   * Get current status for a message
+   */
+  getMessageStatus(messageId: string): string {
+    const subject = this.messageStatuses.get(messageId);
+    return subject ? subject.getValue() : 'PENDING';
+  }
+
+  /**
+   * Subscribe to WebSocket updates for a conversation
+   */
+  subscribeToConversation(conversationId: string): void {
+    this.websocketService.subscribeToConversation(conversationId);
+  }
+
+  /**
+   * Unsubscribe from WebSocket updates for a conversation
+   */
+  unsubscribeFromConversation(conversationId: string): void {
+    this.websocketService.unsubscribeFromConversation(conversationId);
+  }
+
+  /**
+   * Get WebSocket connection state
+   */
+  getConnectionState(): Observable<string> {
+    return this.websocketService.getConnectionState();
+  }
+
+  /**
+   * Check if WebSocket is connected
+   */
+  isWebSocketConnected(): boolean {
+    return this.websocketService.isConnected();
   }
 }

@@ -170,6 +170,37 @@ CREATE TABLE IF NOT EXISTS file_parts (
 CREATE INDEX idx_file_parts_file ON file_parts(file_id, part_number);
 
 -- ==================================================
+-- TABELA: delivery_callbacks
+-- Registra callbacks de status de entrega
+-- ==================================================
+CREATE TABLE IF NOT EXISTS delivery_callbacks (
+    callback_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    message_id UUID NOT NULL,
+    user_id UUID NOT NULL,
+    conversation_id UUID,
+    platform VARCHAR(50) NOT NULL,
+    external_message_id VARCHAR(255),
+    status VARCHAR(50) NOT NULL,
+    previous_status VARCHAR(50),
+    platform_timestamp TIMESTAMP WITH TIME ZONE,
+    error_code VARCHAR(50),
+    error_message TEXT,
+    raw_payload JSONB,
+    metadata JSONB,
+    processed BOOLEAN DEFAULT FALSE,
+    processed_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_callbacks_message_id ON delivery_callbacks(message_id);
+CREATE INDEX idx_callbacks_user_id ON delivery_callbacks(user_id);
+CREATE INDEX idx_callbacks_platform ON delivery_callbacks(platform);
+CREATE INDEX idx_callbacks_status ON delivery_callbacks(status);
+CREATE INDEX idx_callbacks_created_at ON delivery_callbacks(created_at DESC);
+CREATE INDEX idx_callbacks_processed ON delivery_callbacks(processed) WHERE processed = FALSE;
+
+-- ==================================================
 -- DADOS DE TESTE
 -- Inserir usuários para testes
 -- ==================================================

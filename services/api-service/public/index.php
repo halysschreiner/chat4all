@@ -13,9 +13,13 @@ use Chat4All\Api\Middleware\AuthMiddleware;
 use Chat4All\Api\Controller\AuthController;
 use Chat4All\Api\Controller\MessageController;
 use Chat4All\Api\Controller\FileController;
+use Chat4All\Api\Controller\CallbackController;
 use Chat4All\Api\Database\Database;
 use Chat4All\Api\Service\KafkaProducer;
 use Chat4All\Api\Service\MinioService;
+use Chat4All\Api\Service\RedisService;
+use Chat4All\Api\Service\NotificationService;
+use Chat4All\Api\Service\MetricsService;
 use Monolog\Logger;
 use Monolog\Handler\StreamHandler;
 
@@ -101,6 +105,15 @@ $authController = new AuthController($database, $env['JWT_SECRET'], $env['JWT_EX
 $messageController = new MessageController($database, $kafkaProducer, $logger);
 $fileController = new FileController($database, $minioService, $logger);
 
+// Redis e Notification services para callbacks
+$redisService = new RedisService(
+    $env['REDIS_HOST'],
+    (int)$env['REDIS_PORT'],
+    $logger
+);
+$notificationService = new NotificationService($redisService, $logger);
+$callbackController = new CallbackController($database, $notificationService, $logger);
+
 // ==========================================
 // ROTAS PÚBLICAS (sem autenticação)
 // ==========================================
@@ -138,6 +151,41 @@ $app->get('/health', function (Request $request, Response $response) use ($logge
     
     $response->getBody()->write(json_encode($data));
     return $response->withHeader('Content-Type', 'application/json');
+});
+
+// ==========================================
+// MÉTRICAS PROMETHEUS
+// CONCEITO DE SISTEMAS DISTRIBUÍDOS:
+// Expõe métricas no formato Prometheus para monitoramento
+// centralizado. Essencial para observabilidade em sistemas
+// distribuídos - permite detectar problemas de performance,
+// gargalos e falhas em tempo real.
+// ==========================================
+$app->get('/metrics', function (Request $request, Response $response) use ($env, $logger) {
+    try {
+        $metricsService = new MetricsService(
+            $env['REDIS_HOST'],
+            (int)$env['REDIS_PORT'],
+            $logger
+        );
+        
+        $metricsOutput = $metricsService->render();
+        
+        $response->getBody()->write($metricsOutput);
+        return $response
+            ->withHeader('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+    } catch (\Exception $e) {
+        $logger->error('Error generating metrics', ['error' => $e->getMessage()]);
+        
+        // Retorna métricas básicas se houver erro
+        $fallbackMetrics = "# HELP chat4all_api_up API is up\n";
+        $fallbackMetrics .= "# TYPE chat4all_api_up gauge\n";
+        $fallbackMetrics .= "chat4all_api_up 1\n";
+        
+        $response->getBody()->write($fallbackMetrics);
+        return $response
+            ->withHeader('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+    }
 });
 
 // Login - gera JWT token
@@ -229,6 +277,30 @@ $app->get('/v1/conversations/{id}/files', function (Request $request, Response $
 // Deletar arquivo
 $app->delete('/v1/files/{id}', function (Request $request, Response $response, array $args) use ($fileController) {
     return $fileController->deleteFile($request, $response, $args);
+})->add($authMiddleware);
+
+// ==========================================
+// ROTAS DE CALLBACKS (públicas - chamadas pelos conectores)
+// ==========================================
+
+// Callback genérico de status (usado por todos os conectores)
+$app->post('/v1/callbacks/status', function (Request $request, Response $response) use ($callbackController) {
+    return $callbackController->receiveStatus($request, $response);
+});
+
+// Callback específico do WhatsApp
+$app->post('/v1/callbacks/whatsapp', function (Request $request, Response $response) use ($callbackController) {
+    return $callbackController->receiveWhatsappCallback($request, $response);
+});
+
+// Callback específico do Instagram
+$app->post('/v1/callbacks/instagram', function (Request $request, Response $response) use ($callbackController) {
+    return $callbackController->receiveInstagramCallback($request, $response);
+});
+
+// Histórico de callbacks de uma mensagem (protegido)
+$app->get('/v1/callbacks/message/{messageId}', function (Request $request, Response $response, array $args) use ($callbackController) {
+    return $callbackController->getMessageCallbacks($request, $response, $args);
 })->add($authMiddleware);
 
 // ==========================================

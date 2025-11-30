@@ -441,6 +441,80 @@ class Database
     }
 
     /**
+     * Buscar mensagem por ID
+     */
+    public function getMessageById(string $messageId): ?array
+    {
+        $stmt = $this->pdo->prepare('
+            SELECT 
+                message_id as id, conversation_id, from_user_id,
+                content, message_type, status, created_at
+            FROM messages
+            WHERE message_id = :message_id
+        ');
+        $stmt->execute(['message_id' => $messageId]);
+
+        $message = $stmt->fetch();
+        return $message ?: null;
+    }
+
+    /**
+     * Buscar callbacks de uma mensagem
+     */
+    public function getCallbacksByMessageId(string $messageId): array
+    {
+        $stmt = $this->pdo->prepare('
+            SELECT 
+                id, message_id, status, connector,
+                received_at, connector_timestamp, metadata
+            FROM delivery_callbacks
+            WHERE message_id = :message_id
+            ORDER BY received_at ASC
+        ');
+        $stmt->execute(['message_id' => $messageId]);
+
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Inserir callback de entrega
+     */
+    public function insertDeliveryCallback(array $data): bool
+    {
+        $stmt = $this->pdo->prepare('
+            INSERT INTO delivery_callbacks (
+                id, message_id, status, connector,
+                received_at, connector_timestamp, metadata
+            ) VALUES (
+                :id, :message_id, :status, :connector,
+                :received_at, :connector_timestamp, :metadata
+            )
+        ');
+
+        try {
+            $stmt->execute([
+                'id' => $data['id'],
+                'message_id' => $data['message_id'],
+                'status' => $data['status'],
+                'connector' => $data['connector'],
+                'received_at' => $data['received_at'],
+                'connector_timestamp' => $data['connector_timestamp'] ?? null,
+                'metadata' => $data['metadata'] ?? '{}'
+            ]);
+
+            $this->logger->debug("Callback inserido para mensagem {$data['message_id']}", [
+                'status' => $data['status'],
+                'connector' => $data['connector']
+            ]);
+
+            return true;
+        } catch (PDOException $e) {
+            $this->logger->error('Erro ao inserir callback: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
      * Inserir log de auditoria
      */
     public function insertAuditLog(
