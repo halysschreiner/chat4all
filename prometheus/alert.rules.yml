@@ -1,0 +1,264 @@
+# ================================================
+# Prometheus Alert Rules for Chat4All
+# 
+# CONCEITO DE SISTEMAS DISTRIBUÍDOS:
+# Alertas proativos são essenciais para manter a disponibilidade
+# e performance de sistemas distribuídos. Estas regras detectam:
+# - Degradação de performance
+# - Falhas de serviços
+# - Aproximação de limites de capacidade
+# - Comportamentos anômalos
+#
+# Referência: Trabalho Final - Escalabilidade e Relatório (UFG)
+# ================================================
+
+groups:
+  # ================================================
+  # Alertas de Disponibilidade
+  # ================================================
+  - name: availability
+    rules:
+      # API Service indisponível
+      - alert: APIServiceDown
+        expr: up{job="api-service"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: api-service
+        annotations:
+          summary: "API Service está indisponível"
+          description: "O serviço API ({{ $labels.instance }}) está down há mais de 1 minuto."
+
+      # WebSocket Worker indisponível
+      - alert: WebSocketWorkerDown
+        expr: up{job="websocket-worker"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: websocket-worker
+        annotations:
+          summary: "WebSocket Worker está indisponível"
+          description: "O WebSocket Worker ({{ $labels.instance }}) está down há mais de 1 minuto."
+
+      # Router Worker indisponível
+      - alert: RouterWorkerDown
+        expr: up{job="router-worker"} == 0
+        for: 1m
+        labels:
+          severity: warning
+          service: router-worker
+        annotations:
+          summary: "Router Worker está indisponível"
+          description: "Um Router Worker ({{ $labels.instance }}) está down. Verifique se há instâncias suficientes."
+
+      # Kafka indisponível
+      - alert: KafkaDown
+        expr: up{job="kafka-exporter"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: kafka
+        annotations:
+          summary: "Kafka está indisponível"
+          description: "O broker Kafka está inacessível há mais de 2 minutos."
+
+  # ================================================
+  # Alertas de Performance
+  # ================================================
+  - name: performance
+    rules:
+      # Alta latência HTTP (p95 > 500ms)
+      - alert: HighHTTPLatency
+        expr: histogram_quantile(0.95, sum(rate(chat4all_http_request_duration_seconds_bucket[5m])) by (le)) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          service: api-service
+        annotations:
+          summary: "Alta latência nas requisições HTTP"
+          description: "P95 da latência HTTP está acima de 500ms por mais de 5 minutos. Valor atual: {{ $value }}s"
+
+      # Alta latência HTTP crítica (p95 > 2s)
+      - alert: CriticalHTTPLatency
+        expr: histogram_quantile(0.95, sum(rate(chat4all_http_request_duration_seconds_bucket[5m])) by (le)) > 2
+        for: 2m
+        labels:
+          severity: critical
+          service: api-service
+        annotations:
+          summary: "Latência HTTP crítica"
+          description: "P95 da latência HTTP está acima de 2s. Sistema pode estar sobrecarregado."
+
+      # Alta taxa de erros (> 5%)
+      - alert: HighErrorRate
+        expr: sum(rate(chat4all_http_requests_total{status=~"5.."}[5m])) / sum(rate(chat4all_http_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          service: api-service
+        annotations:
+          summary: "Alta taxa de erros HTTP"
+          description: "Taxa de erros 5xx está acima de 5% nos últimos 5 minutos. Valor: {{ $value | humanizePercentage }}"
+
+      # Taxa crítica de erros (> 10%)
+      - alert: CriticalErrorRate
+        expr: sum(rate(chat4all_http_requests_total{status=~"5.."}[5m])) / sum(rate(chat4all_http_requests_total[5m])) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+          service: api-service
+        annotations:
+          summary: "Taxa crítica de erros HTTP"
+          description: "Taxa de erros 5xx está acima de 10%. Investigação imediata necessária."
+
+  # ================================================
+  # Alertas de Kafka/Mensagens
+  # ================================================
+  - name: messaging
+    rules:
+      # Consumer lag alto
+      - alert: KafkaConsumerLagHigh
+        expr: kafka_consumergroup_lag_sum > 1000
+        for: 10m
+        labels:
+          severity: warning
+          service: kafka
+        annotations:
+          summary: "Alto lag no consumer group Kafka"
+          description: "Consumer group {{ $labels.consumergroup }} tem lag de {{ $value }} mensagens. Workers podem estar sobrecarregados."
+
+      # Consumer lag crítico
+      - alert: KafkaConsumerLagCritical
+        expr: kafka_consumergroup_lag_sum > 10000
+        for: 5m
+        labels:
+          severity: critical
+          service: kafka
+        annotations:
+          summary: "Lag crítico no consumer group Kafka"
+          description: "Consumer group {{ $labels.consumergroup }} tem lag de {{ $value }} mensagens. Escale os workers urgentemente."
+
+      # Muitas falhas de processamento
+      - alert: HighMessageProcessingFailures
+        expr: rate(chat4all_messages_processed_total{status="failed"}[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+          service: router-worker
+        annotations:
+          summary: "Alta taxa de falhas no processamento de mensagens"
+          description: "Mais de 1 mensagem/segundo falhando no processamento."
+
+  # ================================================
+  # Alertas de Recursos
+  # ================================================
+  - name: resources
+    rules:
+      # Alta utilização de CPU
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 10m
+        labels:
+          severity: warning
+          component: infrastructure
+        annotations:
+          summary: "Alta utilização de CPU"
+          description: "CPU em {{ $labels.instance }} está acima de 80% por mais de 10 minutos."
+
+      # Alta utilização de memória
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 10m
+        labels:
+          severity: warning
+          component: infrastructure
+        annotations:
+          summary: "Alta utilização de memória"
+          description: "Memória em {{ $labels.instance }} está acima de 85%."
+
+      # Espaço em disco baixo
+      - alert: LowDiskSpace
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 20
+        for: 5m
+        labels:
+          severity: warning
+          component: infrastructure
+        annotations:
+          summary: "Pouco espaço em disco"
+          description: "Disco em {{ $labels.instance }} tem menos de 20% livre."
+
+      # PostgreSQL conexões perto do limite
+      - alert: PostgreSQLConnectionsHigh
+        expr: pg_stat_activity_count / pg_settings_max_connections > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: postgres
+        annotations:
+          summary: "Muitas conexões PostgreSQL"
+          description: "PostgreSQL está usando mais de 80% das conexões disponíveis."
+
+      # Redis memória alta
+      - alert: RedisMemoryHigh
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "Alta utilização de memória Redis"
+          description: "Redis está usando mais de 90% da memória configurada."
+
+  # ================================================
+  # Alertas de WebSocket
+  # ================================================
+  - name: websocket
+    rules:
+      # Poucas conexões WebSocket (pode indicar problema)
+      - alert: WebSocketConnectionsLow
+        expr: chat4all_websocket_connections_active < 1 and hour() >= 8 and hour() <= 22
+        for: 15m
+        labels:
+          severity: info
+          service: websocket-worker
+        annotations:
+          summary: "Nenhuma conexão WebSocket ativa"
+          description: "Não há conexões WebSocket ativas durante horário comercial."
+
+      # Muitos erros de WebSocket
+      - alert: WebSocketErrorsHigh
+        expr: rate(chat4all_ws_errors_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: websocket-worker
+        annotations:
+          summary: "Alta taxa de erros WebSocket"
+          description: "Taxa de erros WebSocket está acima do normal."
+
+  # ================================================
+  # Alertas de Arquivos/Storage
+  # ================================================
+  - name: storage
+    rules:
+      # Muitas falhas de upload
+      - alert: HighFileUploadFailures
+        expr: rate(chat4all_files_uploaded_total{status="failed"}[5m]) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+          service: api-service
+        annotations:
+          summary: "Alta taxa de falhas no upload de arquivos"
+          description: "Uploads de arquivos estão falhando frequentemente. Verifique o MinIO."
+
+      # MinIO indisponível
+      - alert: MinIODown
+        expr: up{job="minio"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: minio
+        annotations:
+          summary: "MinIO está indisponível"
+          description: "O serviço de storage MinIO está down há mais de 2 minutos."

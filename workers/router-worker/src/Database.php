@@ -90,4 +90,45 @@ class Database
             'details' => json_encode($details)
         ]);
     }
+
+    /**
+     * Obter metadados de uma conversa
+     * 
+     * @param string $conversationId ID da conversa
+     * @return array|null Metadados ou null se não encontrado
+     */
+    public function getConversationMetadata(string $conversationId): ?array
+    {
+        $stmt = $this->pdo->prepare('
+            SELECT conversation_id, type, name, created_by 
+            FROM conversations 
+            WHERE conversation_id = :conversation_id
+        ');
+
+        $stmt->execute(['conversation_id' => $conversationId]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $result ?: null;
+    }
+
+    /**
+     * Obter informações de um arquivo
+     * 
+     * @param string $fileId ID do arquivo
+     * @return array|null Dados do arquivo ou null
+     */
+    public function getFileInfo(string $fileId): ?array
+    {
+        $stmt = $this->pdo->prepare('
+            SELECT file_id, user_id, filename, original_filename, file_size, 
+                   content_type, storage_path, status
+            FROM files 
+            WHERE file_id = :file_id
+        ');
+
+        $stmt->execute(['file_id' => $fileId]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $result ?: null;
+    }
 }

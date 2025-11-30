@@ -993,6 +993,270 @@ Para as próximas semanas, considere implementar:
 
 ---
 
+## 🔔 Endpoints de Callback (Connectors)
+
+### POST /v1/callbacks/whatsapp
+
+Recebe callbacks de status do conector WhatsApp.
+
+**Request:**
+
+```bash
+curl -X POST http://localhost:8080/v1/callbacks/whatsapp \
+  -H "Content-Type: application/json" \
+  -H "X-Connector-Secret: whatsapp-connector-secret" \
+  -d '{
+    "message_id": "uuid-da-mensagem",
+    "status": "DELIVERED",
+    "timestamp": "2025-01-15T10:30:00Z",
+    "external_id": "whatsapp-message-id-123"
+  }'
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "success": true,
+  "message_id": "uuid-da-mensagem",
+  "status": "DELIVERED"
+}
+```
+
+### POST /v1/callbacks/instagram
+
+Recebe callbacks de status do conector Instagram.
+
+**Request:**
+
+```bash
+curl -X POST http://localhost:8080/v1/callbacks/instagram \
+  -H "Content-Type: application/json" \
+  -H "X-Connector-Secret: instagram-connector-secret" \
+  -d '{
+    "message_id": "uuid-da-mensagem",
+    "status": "READ",
+    "timestamp": "2025-01-15T10:35:00Z",
+    "external_id": "instagram-message-id-456"
+  }'
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "success": true,
+  "message_id": "uuid-da-mensagem",
+  "status": "READ"
+}
+```
+
+**Status possíveis:**
+- `DELIVERED` - Mensagem entregue ao destinatário
+- `READ` - Mensagem lida pelo destinatário
+- `FAILED` - Falha na entrega
+
+---
+
+## 📁 Endpoints de Upload de Arquivos
+
+### POST /v1/files/upload/initiate
+
+Inicia um upload multipart para arquivos grandes (até 2GB).
+
+**Request:**
+
+```bash
+curl -X POST http://localhost:8080/v1/files/upload/initiate \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "filename": "documento.pdf",
+    "content_type": "application/pdf",
+    "size": 104857600
+  }'
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "upload_id": "abc123xyz",
+  "file_id": "uuid-do-arquivo",
+  "parts": [
+    {"part_number": 1, "upload_url": "https://..."},
+    {"part_number": 2, "upload_url": "https://..."}
+  ],
+  "part_size": 5242880
+}
+```
+
+### PUT /v1/files/upload/{uploadId}/part/{partNumber}
+
+Envia uma parte do arquivo.
+
+**Request:**
+
+```bash
+curl -X PUT "http://localhost:8080/v1/files/upload/abc123xyz/part/1" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/octet-stream" \
+  --data-binary @parte1.bin
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "part_number": 1,
+  "etag": "\"d41d8cd98f00b204e9800998ecf8427e\""
+}
+```
+
+### POST /v1/files/upload/{uploadId}/complete
+
+Finaliza o upload multipart.
+
+**Request:**
+
+```bash
+curl -X POST "http://localhost:8080/v1/files/upload/abc123xyz/complete" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "parts": [
+      {"part_number": 1, "etag": "\"etag1\""},
+      {"part_number": 2, "etag": "\"etag2\""}
+    ]
+  }'
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "file_id": "uuid-do-arquivo",
+  "filename": "documento.pdf",
+  "size": 104857600,
+  "content_type": "application/pdf",
+  "checksum": "abc123...",
+  "created_at": "2025-01-15T10:30:00Z"
+}
+```
+
+### GET /v1/files/{fileId}
+
+Obtém metadados de um arquivo.
+
+**Request:**
+
+```bash
+curl -X GET http://localhost:8080/v1/files/uuid-do-arquivo \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "id": "uuid-do-arquivo",
+  "filename": "documento.pdf",
+  "content_type": "application/pdf",
+  "size": 104857600,
+  "checksum": "abc123...",
+  "user_id": "uuid-do-usuario",
+  "created_at": "2025-01-15T10:30:00Z"
+}
+```
+
+### GET /v1/files/{fileId}/download
+
+Obtém URL temporária para download.
+
+**Request:**
+
+```bash
+curl -X GET http://localhost:8080/v1/files/uuid-do-arquivo/download \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "download_url": "https://minio.local:9000/chat4all-files/...",
+  "expires_at": "2025-01-15T11:30:00Z",
+  "filename": "documento.pdf",
+  "content_type": "application/pdf",
+  "size": 104857600
+}
+```
+
+---
+
+## 📊 Endpoints de Métricas
+
+### GET /metrics
+
+Expõe métricas no formato Prometheus para monitoramento.
+
+**Request:**
+
+```bash
+curl http://localhost:8080/metrics
+```
+
+**Response (200 OK):**
+
+```text
+# HELP http_requests_total Total number of HTTP requests
+# TYPE http_requests_total counter
+http_requests_total{method="GET",endpoint="/v1/conversations",status="200"} 1523
+
+# HELP http_request_duration_seconds HTTP request duration in seconds
+# TYPE http_request_duration_seconds histogram
+http_request_duration_seconds_bucket{method="POST",endpoint="/v1/messages",le="0.1"} 850
+http_request_duration_seconds_bucket{method="POST",endpoint="/v1/messages",le="0.5"} 1200
+http_request_duration_seconds_bucket{method="POST",endpoint="/v1/messages",le="1"} 1250
+
+# HELP messages_total Total number of messages processed
+# TYPE messages_total counter
+messages_total{status="SENT"} 10234
+messages_total{status="DELIVERED"} 9856
+messages_total{status="READ"} 8432
+
+# HELP files_uploaded_total Total number of files uploaded
+# TYPE files_uploaded_total counter
+files_uploaded_total 523
+
+# HELP files_uploaded_bytes_total Total bytes of files uploaded
+# TYPE files_uploaded_bytes_total counter
+files_uploaded_bytes_total 5368709120
+
+# HELP websocket_connections_active Active WebSocket connections
+# TYPE websocket_connections_active gauge
+websocket_connections_active 42
+
+# HELP kafka_messages_produced_total Total Kafka messages produced
+# TYPE kafka_messages_produced_total counter
+kafka_messages_produced_total{topic="messages"} 10234
+kafka_messages_produced_total{topic="status-updates"} 18288
+```
+
+**Métricas Disponíveis:**
+
+| Métrica | Tipo | Descrição |
+|---------|------|-----------|
+| `http_requests_total` | Counter | Total de requisições HTTP |
+| `http_request_duration_seconds` | Histogram | Latência das requisições |
+| `messages_total` | Counter | Total de mensagens por status |
+| `files_uploaded_total` | Counter | Total de arquivos enviados |
+| `files_uploaded_bytes_total` | Counter | Total de bytes enviados |
+| `websocket_connections_active` | Gauge | Conexões WebSocket ativas |
+| `kafka_messages_produced_total` | Counter | Mensagens publicadas no Kafka |
+
+---
+
 ## 📝 Notas Importantes
 
 ### Segurança

@@ -1,14 +1,16 @@
-import { Component, OnInit, ViewChild, ElementRef, AfterViewChecked } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewChecked } from '@angular/core';
 import { ChatService } from '../../services/chat.service';
 import { AuthService } from '../../services/auth.service';
 import { Router } from '@angular/router';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 
 @Component({
   selector: 'app-chat',
   templateUrl: './chat.component.html',
   styleUrls: ['./chat.component.css']
 })
-export class ChatComponent implements OnInit, AfterViewChecked {
+export class ChatComponent implements OnInit, AfterViewChecked, OnDestroy {
   conversations: any[] = [];
   selectedConversation: any = null;
   messages: any[] = [];
@@ -27,6 +29,11 @@ export class ChatComponent implements OnInit, AfterViewChecked {
   isUploading = false;
   uploadProgress = 0;
 
+  // WebSocket connection state
+  connectionState: string = 'disconnected';
+  
+  private destroy$ = new Subject<void>();
+
   @ViewChild('scrollMe') private myScrollContainer!: ElementRef;
 
   constructor(
@@ -39,13 +46,32 @@ export class ChatComponent implements OnInit, AfterViewChecked {
 
   ngOnInit() {
     this.loadConversations();
-    // Poll for new messages every 5 seconds
+    
+    // Escutar estado da conexão WebSocket
+    this.chatService.getConnectionState().pipe(
+      takeUntil(this.destroy$)
+    ).subscribe(state => {
+      this.connectionState = state;
+      console.log('[Chat] WebSocket connection state:', state);
+    });
+    
+    // Poll for new messages every 10 seconds (WebSocket handles real-time updates)
     setInterval(() => {
       if (this.selectedConversation) {
         this.loadMessages(this.selectedConversation.conversation_id);
       }
       this.loadConversations();
-    }, 5000);
+    }, 10000);
+  }
+
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
+    
+    // Unsubscribe from current conversation
+    if (this.selectedConversation) {
+      this.chatService.unsubscribeFromConversation(this.selectedConversation.conversation_id);
+    }
   }
 
   ngAfterViewChecked() {
@@ -67,8 +93,16 @@ export class ChatComponent implements OnInit, AfterViewChecked {
   }
 
   selectConversation(conversation: any) {
+    // Unsubscribe from previous conversation
+    if (this.selectedConversation) {
+      this.chatService.unsubscribeFromConversation(this.selectedConversation.conversation_id);
+    }
+    
     this.selectedConversation = conversation;
     this.loadMessages(conversation.conversation_id);
+    
+    // Subscribe to WebSocket updates for this conversation
+    this.chatService.subscribeToConversation(conversation.conversation_id);
     
     // Marcar mensagens como lidas quando selecionar a conversa
     this.markConversationAsRead(conversation.conversation_id);
@@ -78,12 +112,69 @@ export class ChatComponent implements OnInit, AfterViewChecked {
     this.chatService.getMessages(conversationId).subscribe(response => {
       if (response.success) {
         this.messages = response.messages.reverse(); // Show oldest first
+        
+        // Initialize status tracking for each message
+        this.messages.forEach((msg: any) => {
+          this.chatService.initializeMessageStatus(msg.message_id, msg.status || 'PENDING');
+        });
+        
         console.log('Messages loaded:', this.messages);
         console.log('Current user object:', this.currentUser);
         console.log('Current user ID:', this.currentUser?.user?.user_id || this.currentUser?.user_id);
         console.log('First message from_user_id:', this.messages[0]?.from_user_id);
       }
     });
+  }
+
+  /**
+   * Get status indicator for a message
+   * ✓ = Sent
+   * ✓✓ = Delivered
+   * ✓✓ (blue) = Read
+   */
+  getStatusIndicator(message: any): string {
+    const status = this.chatService.getMessageStatus(message.message_id) || message.status || 'PENDING';
+    
+    switch (status) {
+      case 'SENT':
+        return '✓';
+      case 'DELIVERED':
+        return '✓✓';
+      case 'READ':
+        return '✓✓'; // Will be styled blue in CSS
+      case 'FAILED':
+        return '✗';
+      default:
+        return '○'; // Pending
+    }
+  }
+
+  /**
+   * Get CSS class for status indicator
+   */
+  getStatusClass(message: any): string {
+    const status = this.chatService.getMessageStatus(message.message_id) || message.status || 'PENDING';
+    
+    switch (status) {
+      case 'READ':
+        return 'status-read';
+      case 'DELIVERED':
+        return 'status-delivered';
+      case 'SENT':
+        return 'status-sent';
+      case 'FAILED':
+        return 'status-failed';
+      default:
+        return 'status-pending';
+    }
+  }
+
+  /**
+   * Check if current user is the sender
+   */
+  isOwnMessage(message: any): boolean {
+    const currentUserId = this.currentUser?.user?.user_id || this.currentUser?.user_id;
+    return message.from_user_id === currentUserId;
   }
 
   markConversationAsRead(conversationId: string) {

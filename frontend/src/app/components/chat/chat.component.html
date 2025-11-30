@@ -49,17 +49,21 @@
         </div>
         <div class="header-info">
           <h3>{{ selectedConversation.name }}</h3>
-          <span class="status">{{ selectedConversation.type === 'group' ? 'Group' : 'Private' }}</span>
+          <span class="status">
+            {{ selectedConversation.type === 'group' ? 'Group' : 'Private' }}
+            <span *ngIf="connectionState === 'connected'" class="ws-connected" title="Real-time updates enabled">●</span>
+            <span *ngIf="connectionState !== 'connected'" class="ws-disconnected" title="Connecting...">○</span>
+          </span>
         </div>
       </div>
 
       <div class="messages-list" #scrollMe>
         <div *ngFor="let msg of messages" 
              class="message-bubble" 
-             [class.sent]="msg.from_user_id === (currentUser?.user?.user_id || currentUser?.user_id)"
-             [class.received]="msg.from_user_id !== (currentUser?.user?.user_id || currentUser?.user_id)">
+             [class.sent]="isOwnMessage(msg)"
+             [class.received]="!isOwnMessage(msg)">
           
-          <div *ngIf="selectedConversation.type === 'group' && msg.from_user_id !== (currentUser?.user?.user_id || currentUser?.user_id)" class="message-sender">
+          <div *ngIf="selectedConversation.type === 'group' && !isOwnMessage(msg)" class="message-sender">
             {{ msg.from_username || 'Unknown' }}
           </div>
 
@@ -76,13 +80,12 @@
           </div>
           <div class="message-meta">
             <span class="time">{{ msg.created_at | date:'shortTime' }}</span>
-            <span *ngIf="msg.from_user_id === (currentUser?.user?.user_id || currentUser?.user_id)" class="status-icon" 
-                  [class.sent]="msg.status === 'SENT'"
-                  [class.delivered]="msg.status === 'DELIVERED'"
-                  [class.read]="msg.status === 'READ'">
-              <span *ngIf="msg.status === 'SENT'" class="single-check">✓</span>
-              <span *ngIf="msg.status === 'DELIVERED'" class="double-check">✓✓</span>
-              <span *ngIf="msg.status === 'READ'" class="double-check-blue">✓✓</span>
+            <!-- Status indicators only for own messages -->
+            <span *ngIf="isOwnMessage(msg)" 
+                  class="status-icon" 
+                  [ngClass]="getStatusClass(msg)"
+                  [title]="getStatusIndicator(msg)">
+              {{ getStatusIndicator(msg) }}
             </span>
           </div>
         </div>

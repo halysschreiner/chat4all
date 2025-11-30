@@ -487,3 +487,38 @@
 .status-icon.read .double-check-blue {
   color: #4fc3f7;
 }
+
+/* WebSocket connection indicator */
+.ws-connected {
+  color: #4caf50;
+  font-size: 0.75rem;
+  margin-left: 0.5rem;
+}
+
+.ws-disconnected {
+  color: #ff9800;
+  font-size: 0.75rem;
+  margin-left: 0.5rem;
+}
+
+/* Status indicator colors */
+.status-icon.status-pending {
+  color: #757575;
+}
+
+.status-icon.status-sent {
+  color: #9e9e9e;
+}
+
+.status-icon.status-delivered {
+  color: #bdbdbd;
+}
+
+.status-icon.status-read {
+  color: #4fc3f7;
+  font-weight: bold;
+}
+
+.status-icon.status-failed {
+  color: #f44336;
+}
