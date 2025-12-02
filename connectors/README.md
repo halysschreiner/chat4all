@@ -8,13 +8,15 @@ Este diretório contém os conectores simulados (mock) para integração com pla
 Simula a integração com a API do WhatsApp Business.
 
 **Porta:** 8081  
-**Tópico Kafka:** `whatsapp.messages`
+**Tópico Kafka:** `whatsapp.messages`  
+**Delays típicos:** DELIVERED 1-3s, READ 3-8s
 
 ### 2. Instagram Mock (`instagram-mock`)
 Simula a integração com a API do Instagram Direct.
 
 **Porta:** 8082  
-**Tópico Kafka:** `instagram.messages`
+**Tópico Kafka:** `instagram.messages`  
+**Delays típicos:** DELIVERED 2-4s, READ 5-12s
 
 ---
 
@@ -32,12 +34,21 @@ Cada connector possui:
 - **POST `/webhook/incoming`**: Recebe mensagens simuladas do canal externo
 - **POST `/send`**: Endpoint de teste para simular envio manual
 
-### 3. **Simulação de Callbacks**
+### 3. **CallbackSender**
+Classe responsável por enviar callbacks de status para o backend com:
+- **Retry com backoff exponencial** (1s, 2s, 4s)
+- **Tratamento de erros HTTP** (retry apenas para 5xx)
+- **Logs estruturados** para debugging
+
+### 4. **Simulação de Callbacks**
 Cada connector simula os seguintes eventos:
 
-1. **SENT** - Mensagem enviada (imediato)
-2. **DELIVERED** - Mensagem entregue (1-4s depois)
-3. **READ** - Mensagem lida (5-15s depois)
+| Status | WhatsApp | Instagram | Descrição |
+|--------|----------|-----------|-----------|
+| **SENT** | Imediato | Imediato | Mensagem enviada ao servidor |
+| **DELIVERED** | 1-3s | 2-4s | Mensagem entregue ao dispositivo |
+| **READ** | 3-8s | 5-12s | Mensagem visualizada pelo usuário |
+| **FAILED** | Simulado | Simulado | Falha no envio (configurável) |
 
 ---
 
@@ -55,13 +66,14 @@ sequenceDiagram
     Backend->>Kafka: Publica mensagem no tópico
     Kafka->>Connector: Consumer recebe mensagem
     Connector->>External: Simula envio (delay 50-300ms)
-    Connector->>Connector: Log: "✅ Entregue a usuário X"
+    Connector->>Backend: Callback: SENT (HTTP POST)
+    Connector->>Connector: Log: "✅ Mensagem enviada"
     
     Note over Connector: Aguarda 1-4 segundos
-    Connector->>Backend: Callback: DELIVERED
+    Connector->>Backend: Callback: DELIVERED (HTTP POST)
     
-    Note over Connector: Aguarda 5-15 segundos
-    Connector->>Backend: Callback: READ
+    Note over Connector: Aguarda 3-12 segundos
+    Connector->>Backend: Callback: READ (HTTP POST)
 ```
 
 ### Fluxo de Recebimento de Mensagem
@@ -90,6 +102,7 @@ sequenceDiagram
   "message_id": "uuid-da-mensagem",
   "to": "+5511999999999",
   "text": "Olá, como vai?",
+  "file_id": "uuid-do-arquivo",
   "conversation_id": "uuid-da-conversa",
   "timestamp": 1234567890
 }
@@ -181,12 +194,31 @@ Os conectores geram logs coloridos e informativos:
 
 ## 🔧 Configuração
 
-As variáveis de ambiente disponíveis:
+### Variáveis de Ambiente
 
 | Variável | Padrão | Descrição |
 |----------|--------|-----------|
 | `KAFKA_BROKER` | `kafka:9093` | Endereço do broker Kafka |
-| `BACKEND_CALLBACK_URL` | `http://api-service:8080/v1/callbacks/{connector}` | URL para enviar callbacks |
+| `BACKEND_CALLBACK_URL` | `http://api-service:8080/v1/callbacks/status` | URL para enviar callbacks |
+| `DELIVERY_MIN_DELAY` | `1` (WA) / `2` (IG) | Delay mínimo para DELIVERED (segundos) |
+| `DELIVERY_MAX_DELAY` | `3` (WA) / `4` (IG) | Delay máximo para DELIVERED (segundos) |
+| `READ_MIN_DELAY` | `3` (WA) / `5` (IG) | Delay mínimo para READ (segundos) |
+| `READ_MAX_DELAY` | `8` (WA) / `12` (IG) | Delay máximo para READ (segundos) |
+| `FAILURE_PROBABILITY` | `0.0` | Probabilidade de falha simulada (0.0 a 1.0) |
+
+### Exemplo de Configuração no docker-compose.yml
+
+```yaml
+connector-whatsapp:
+  environment:
+    KAFKA_BROKER: kafka:9093
+    BACKEND_CALLBACK_URL: http://api-service:8080/v1/callbacks/status
+    DELIVERY_MIN_DELAY: 1
+    DELIVERY_MAX_DELAY: 3
+    READ_MIN_DELAY: 3
+    READ_MAX_DELAY: 8
+    FAILURE_PROBABILITY: 0.05  # 5% de falhas simuladas
+```
 
 ---
 
@@ -204,7 +236,8 @@ connector-{nome}/
 │   └── index.php       # API HTTP (Slim)
 └── src/
     ├── KafkaConsumer.php    # Lógica de consumo do Kafka
-    └── MessageProcessor.php  # Processamento e simulação
+    ├── MessageProcessor.php  # Processamento e simulação
+    └── CallbackSender.php   # Envio de callbacks com retry
 ```
 
 ### Adicionando um novo connector:
@@ -236,8 +269,9 @@ connector-{nome}:
 
 ## 📚 Próximos Passos
 
-- [ ] Implementar endpoints de callback no backend (`/v1/callbacks/{connector}`)
-- [ ] Adicionar suporte a anexos (imagens, vídeos, documentos)
+- [x] Implementar CallbackSender com retry exponencial
+- [x] Adicionar suporte a anexos (file_id no payload)
+- [x] Configurar delays via variáveis de ambiente
+- [x] Simular erros e falhas (FAILURE_PROBABILITY)
 - [ ] Implementar rate limiting simulado
-- [ ] Adicionar métricas e monitoramento
-- [ ] Simular erros e falhas (timeout, API indisponível, etc.)
+- [ ] Adicionar métricas Prometheus

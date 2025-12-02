@@ -1,131 +1,229 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Chat4All\Connector\Instagram;
 
 use Psr\Log\LoggerInterface;
 
+/**
+ * MessageProcessor - Processa mensagens recebidas do Kafka
+ * 
+ * Simula o envio de mensagens via Instagram Direct e dispara callbacks
+ * de status (SENT, DELIVERED, READ) para o backend.
+ */
 class MessageProcessor
 {
     private LoggerInterface $logger;
+    private CallbackSender $callbackSender;
+    
+    // Configurações de delay simulado (em segundos)
+    // Instagram tipicamente tem delays maiores que WhatsApp
+    private int $deliveryMinDelay = 2;
+    private int $deliveryMaxDelay = 4;
+    private int $readMinDelay = 5;
+    private int $readMaxDelay = 12;
+    
+    // Probabilidade de falha simulada (0.0 a 1.0)
+    private float $failureProbability = 0.0;
 
-    public function __construct(LoggerInterface $logger)
+    public function __construct(LoggerInterface $logger, ?CallbackSender $callbackSender = null)
     {
         $this->logger = $logger;
+        $this->callbackSender = $callbackSender ?? new CallbackSender($logger);
+        
+        // Carregar configurações do ambiente
+        $this->loadConfig();
+    }
+    
+    /**
+     * Carrega configurações do ambiente
+     */
+    private function loadConfig(): void
+    {
+        if ($val = getenv('DELIVERY_MIN_DELAY')) {
+            $this->deliveryMinDelay = (int)$val;
+        }
+        if ($val = getenv('DELIVERY_MAX_DELAY')) {
+            $this->deliveryMaxDelay = (int)$val;
+        }
+        if ($val = getenv('READ_MIN_DELAY')) {
+            $this->readMinDelay = (int)$val;
+        }
+        if ($val = getenv('READ_MAX_DELAY')) {
+            $this->readMaxDelay = (int)$val;
+        }
+        if ($val = getenv('FAILURE_PROBABILITY')) {
+            $this->failureProbability = (float)$val;
+        }
     }
 
+    /**
+     * Processa uma mensagem do Kafka
+     */
     public function process(string $payload): void
     {
         try {
             $data = json_decode($payload, true);
 
             if (!$data) {
-                $this->logger->error('Invalid JSON payload');
+                $this->logger->error('[Instagram] ❌ Payload JSON inválido');
                 return;
             }
 
-            $messageId = $data['message_id'] ?? 'unknown';
+            $messageId = $data['message_id'] ?? null;
             $to = $data['to'] ?? 'unknown';
             $text = $data['text'] ?? '';
+            $fileId = $data['file_id'] ?? null;
+
+            if (!$messageId) {
+                $this->logger->error('[Instagram] ❌ message_id ausente no payload');
+                return;
+            }
 
             // Log de recebimento
             $this->logger->info('[Instagram] 📥 Mensagem recebida do Kafka', [
                 'message_id' => $messageId,
-                'to' => $to
+                'to' => $to,
+                'has_file' => $fileId !== null
             ]);
 
-            // Simular processamento e envio
-            $this->simulateSending($messageId, $to, $text);
+            // Simular falha aleatória se configurado
+            if ($this->shouldSimulateFailure()) {
+                $this->handleFailure($messageId, $to);
+                return;
+            }
 
-            // Simular callbacks de status
-            $this->simulateDeliveryCallback($messageId, $to);
-            $this->simulateReadCallback($messageId, $to);
+            // Simular processamento e envio
+            $this->simulateSending($messageId, $to, $text, $fileId);
+
+            // Enviar callbacks de status via CallbackSender
+            $this->sendDeliveryCallbacks($messageId, $to);
 
         } catch (\Exception $e) {
-            $this->logger->error('Error processing message: ' . $e->getMessage());
+            $this->logger->error('[Instagram] ❌ Erro ao processar mensagem: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
         }
     }
 
-    private function simulateSending(string $messageId, string $to, string $text): void
+    /**
+     * Simula o envio da mensagem
+     */
+    private function simulateSending(string $messageId, string $to, string $text, ?string $fileId): void
     {
-        // Simular delay de envio (100-300ms)
+        // Simular delay de envio Instagram (100-300ms - um pouco mais lento que WhatsApp)
         usleep(rand(100000, 300000));
 
-        $this->logger->info("[Instagram] ✅ Entregue a usuário {$to}", [
+        $logContext = [
             'message_id' => $messageId,
             'text' => substr($text, 0, 50) . (strlen($text) > 50 ? '...' : '')
-        ]);
-    }
-
-    private function simulateDeliveryCallback(string $messageId, string $to): void
-    {
-        // Simular delay até entrega (2-4 segundos)
-        sleep(rand(2, 4));
-
-        $this->logger->info("[Instagram] 📬 Callback: DELIVERED", [
-            'message_id' => $messageId,
-            'to' => $to,
-            'timestamp' => date('Y-m-d H:i:s')
-        ]);
-
-        // Aqui você poderia fazer um HTTP POST para o backend informando a entrega
-        $this->sendCallbackToBackend($messageId, 'DELIVERED');
-    }
-
-    private function simulateReadCallback(string $messageId, string $to): void
-    {
-        // Simular delay até leitura (8-15 segundos após entrega)
-        sleep(rand(8, 15));
-
-        $this->logger->info("[Instagram] 👁️ Callback: READ", [
-            'message_id' => $messageId,
-            'to' => $to,
-            'timestamp' => date('Y-m-d H:i:s')
-        ]);
-
-        // Aqui você poderia fazer um HTTP POST para o backend informando a leitura
-        $this->sendCallbackToBackend($messageId, 'READ');
-    }
-
-    private function sendCallbackToBackend(string $messageId, string $status): void
-    {
-        // Simulação de callback - em produção faria HTTP POST para API
-        $backendUrl = getenv('BACKEND_CALLBACK_URL') ?: 'http://api-service:8080/v1/callbacks/instagram';
-
-        $payload = [
-            'message_id' => $messageId,
-            'status' => $status,
-            'timestamp' => time(),
-            'connector' => 'instagram'
         ];
 
-        // Por enquanto apenas logamos. Você pode implementar o HTTP POST se necessário.
-        $this->logger->debug('[Instagram] Would send callback to backend', [
-            'url' => $backendUrl,
-            'payload' => $payload
+        if ($fileId) {
+            $logContext['file_id'] = $fileId;
+            $this->logger->info("[Instagram] 📎 Mensagem com anexo enviada para {$to}", $logContext);
+        } else {
+            $this->logger->info("[Instagram] ✅ Mensagem enviada para {$to}", $logContext);
+        }
+
+        // Enviar callback SENT imediatamente
+        $this->callbackSender->send($messageId, 'SENT', [
+            'recipient' => $to,
+            'has_attachment' => $fileId !== null
+        ]);
+    }
+
+    /**
+     * Envia callbacks de entrega e leitura com delays simulados
+     */
+    private function sendDeliveryCallbacks(string $messageId, string $to): void
+    {
+        // Callback DELIVERED (2-4 segundos - Instagram é mais lento)
+        $this->callbackSender->sendDeliveredWithDelay(
+            $messageId,
+            $this->deliveryMinDelay,
+            $this->deliveryMaxDelay
+        );
+
+        $this->logger->info("[Instagram] 📬 Callback DELIVERED enviado", [
+            'message_id' => $messageId,
+            'to' => $to
         ]);
 
-        // Exemplo de implementação real (descomente se quiser):
-        /*
-        try {
-            $ch = curl_init($backendUrl);
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
-            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 5);
-            
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
+        // Callback READ (5-12 segundos após DELIVERED - usuários Instagram demoram mais para ler)
+        $this->callbackSender->sendReadWithDelay(
+            $messageId,
+            $this->readMinDelay,
+            $this->readMaxDelay
+        );
 
-            if ($httpCode >= 200 && $httpCode < 300) {
-                $this->logger->info('[Instagram] Callback sent successfully');
-            } else {
-                $this->logger->warning('[Instagram] Callback failed', ['http_code' => $httpCode]);
-            }
-        } catch (\Exception $e) {
-            $this->logger->error('[Instagram] Error sending callback: ' . $e->getMessage());
+        $this->logger->info("[Instagram] 👁️ Callback READ enviado", [
+            'message_id' => $messageId,
+            'to' => $to
+        ]);
+    }
+
+    /**
+     * Verifica se deve simular falha
+     */
+    private function shouldSimulateFailure(): bool
+    {
+        if ($this->failureProbability <= 0.0) {
+            return false;
         }
-        */
+        
+        return (mt_rand() / mt_getrandmax()) < $this->failureProbability;
+    }
+
+    /**
+     * Trata falha simulada
+     */
+    private function handleFailure(string $messageId, string $to): void
+    {
+        $errorCodes = [
+            'USER_NOT_FOUND' => 'Usuário não encontrado no Instagram',
+            'ACCOUNT_PRIVATE' => 'Conta do destinatário é privada',
+            'RATE_LIMITED' => 'Limite de mensagens atingido',
+            'MEDIA_REJECTED' => 'Mídia rejeitada pelo Instagram',
+            'BLOCKED' => 'Você foi bloqueado pelo destinatário'
+        ];
+
+        $errorCode = array_rand($errorCodes);
+        $errorMessage = $errorCodes[$errorCode];
+
+        $this->logger->warning("[Instagram] ⚠️ Falha simulada ao enviar para {$to}", [
+            'message_id' => $messageId,
+            'error_code' => $errorCode,
+            'error_message' => $errorMessage
+        ]);
+
+        $this->callbackSender->sendFailed($messageId, $errorCode, $errorMessage);
+    }
+
+    /**
+     * Configura probabilidade de falha (para testes)
+     */
+    public function setFailureProbability(float $probability): void
+    {
+        $this->failureProbability = max(0.0, min(1.0, $probability));
+    }
+
+    /**
+     * Configura delays de entrega (para testes)
+     */
+    public function setDeliveryDelays(int $minDelay, int $maxDelay): void
+    {
+        $this->deliveryMinDelay = $minDelay;
+        $this->deliveryMaxDelay = $maxDelay;
+    }
+
+    /**
+     * Configura delays de leitura (para testes)
+     */
+    public function setReadDelays(int $minDelay, int $maxDelay): void
+    {
+        $this->readMinDelay = $minDelay;
+        $this->readMaxDelay = $maxDelay;
     }
 }

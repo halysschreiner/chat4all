@@ -1,0 +1,206 @@
+openapi: 3.0.3
+info:
+  title: Chat4All Callbacks API
+  description: |
+    API para receber callbacks de entrega e leitura dos connectors mock.
+    
+    ## Conceitos de Sistemas Distribuídos Demonstrados
+    - **Webhooks/Callbacks**: Comunicação assíncrona entre serviços
+    - **Event-Driven Architecture**: Status updates propagados via eventos
+    - **Idempotency**: Callbacks podem ser reenviados sem efeitos colaterais
+    
+  version: 1.0.0
+  contact:
+    name: UFG - Sistemas Distribuídos
+
+servers:
+  - url: http://localhost:8080/v1
+    description: API Service interno (connectors usam diretamente)
+
+paths:
+  /callbacks/whatsapp:
+    post:
+      summary: Callback do WhatsApp Mock Connector
+      description: |
+        Recebe notificações de entrega e leitura do connector WhatsApp mock.
+        
+        **Fluxo**:
+        1. Connector processa mensagem do Kafka
+        2. Simula entrega (delay 1-3s)
+        3. Envia callback DELIVERED
+        4. Simula leitura (delay 3-8s)
+        5. Envia callback READ
+      tags:
+        - Callbacks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeliveryCallback'
+      responses:
+        '200':
+          description: Callback processado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallbackResponse'
+        '400':
+          description: Payload inválido
+        '404':
+          description: Mensagem não encontrada
+        '409':
+          description: Status já processado (idempotente)
+
+  /callbacks/instagram:
+    post:
+      summary: Callback do Instagram Mock Connector
+      description: |
+        Recebe notificações de entrega e leitura do connector Instagram mock.
+        Mesma estrutura do WhatsApp callback.
+      tags:
+        - Callbacks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeliveryCallback'
+      responses:
+        '200':
+          description: Callback processado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallbackResponse'
+        '400':
+          description: Payload inválido
+        '404':
+          description: Mensagem não encontrada
+        '409':
+          description: Status já processado (idempotente)
+
+  /callbacks/status/{messageId}:
+    get:
+      summary: Consultar histórico de callbacks de uma mensagem
+      description: |
+        Retorna todos os callbacks recebidos para uma mensagem específica.
+        Útil para debugging e demonstração do fluxo.
+      tags:
+        - Callbacks
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Lista de callbacks
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messageId:
+                    type: string
+                    format: uuid
+                  currentStatus:
+                    type: string
+                    enum: [SENT, DELIVERED, READ, FAILED]
+                  callbacks:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CallbackRecord'
+        '404':
+          description: Mensagem não encontrada
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    DeliveryCallback:
+      type: object
+      required:
+        - messageId
+        - status
+        - timestamp
+        - platform
+      properties:
+        messageId:
+          type: string
+          format: uuid
+          description: ID da mensagem no sistema
+        status:
+          type: string
+          enum: [DELIVERED, READ]
+          description: Novo status da mensagem
+        timestamp:
+          type: string
+          format: date-time
+          description: Quando o evento ocorreu (horário do connector)
+        platform:
+          type: string
+          enum: [whatsapp, instagram]
+          description: Plataforma de origem
+        externalId:
+          type: string
+          description: ID simulado da plataforma externa
+          example: "wa_msg_123456789"
+        metadata:
+          type: object
+          description: Dados adicionais do callback (opcional)
+          additionalProperties: true
+
+    CallbackResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        callbackId:
+          type: string
+          format: uuid
+          description: ID do registro de callback criado
+        messageId:
+          type: string
+          format: uuid
+        previousStatus:
+          type: string
+          enum: [SENT, DELIVERED, READ]
+        newStatus:
+          type: string
+          enum: [DELIVERED, READ]
+        processedAt:
+          type: string
+          format: date-time
+        notificationSent:
+          type: boolean
+          description: Se notificação WebSocket foi enviada
+
+    CallbackRecord:
+      type: object
+      properties:
+        callbackId:
+          type: string
+          format: uuid
+        platform:
+          type: string
+        status:
+          type: string
+        externalId:
+          type: string
+        receivedAt:
+          type: string
+          format: date-time
+        processedAt:
+          type: string
+          format: date-time
+        payload:
+          type: object
