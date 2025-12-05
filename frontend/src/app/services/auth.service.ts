@@ -6,7 +6,7 @@ import { BehaviorSubject, Observable, tap } from 'rxjs';
   providedIn: 'root'
 })
 export class AuthService {
-  private apiUrl = 'http://localhost:8000/v1/auth';
+  private apiUrl = `http://${window.location.hostname}:8000/v1/auth`;
   private currentUserSubject = new BehaviorSubject<any>(JSON.parse(localStorage.getItem('currentUser') || '{}'));
   public currentUser = this.currentUserSubject.asObservable();
 
@@ -19,9 +19,9 @@ export class AuthService {
   login(emailOrPhone: string, password: string): Observable<any> {
     const isEmail = emailOrPhone.includes('@');
     const payload = {
-        email: isEmail ? emailOrPhone : null,
-        phone: !isEmail ? emailOrPhone.replace(/\D/g, '') : null,
-        password
+      email: isEmail ? emailOrPhone : null,
+      phone: !isEmail ? emailOrPhone.replace(/\D/g, '') : null,
+      password
     };
     return this.http.post<any>(`${this.apiUrl}/login`, payload)
       .pipe(tap(user => {

@@ -3,10 +3,10 @@ FROM node:20-alpine as build
 
 WORKDIR /app
 
-COPY frontend/package.json frontend/package-lock.json* ./
+COPY package.json package-lock.json* ./
 RUN npm install
 
-COPY frontend/ .
+COPY . .
 RUN npm run build -- --configuration production
 
 # Stage 2: Serve with Nginx

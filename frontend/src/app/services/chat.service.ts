@@ -25,16 +25,16 @@ export interface Message {
   providedIn: 'root'
 })
 export class ChatService implements OnDestroy {
-  private apiUrl = 'http://localhost:8000/v1';
-  private fileApiUrl = 'http://localhost:8080/v1'; // API Service direto para arquivos
-  
+  private apiUrl = `http://${window.location.hostname}:8000/v1`;
+  private fileApiUrl = `http://${window.location.hostname}:8080/v1`; // API Service direto para arquivos
+
   private destroy$ = new Subject<void>();
-  
+
   // Cache de status de mensagens para atualização em tempo real
   private messageStatuses = new Map<string, BehaviorSubject<string>>();
 
   constructor(
-    private http: HttpClient, 
+    private http: HttpClient,
     private authService: AuthService,
     private websocketService: WebsocketService
   ) {
@@ -73,11 +73,11 @@ export class ChatService implements OnDestroy {
       content: content,
       message_type: messageType
     };
-    
+
     if (fileId) {
       body.file_id = fileId;
     }
-    
+
     return this.http.post(`${this.apiUrl}/messages`, body, { headers: this.getHeaders() });
   }
 

@@ -5,6 +5,21 @@ echo "========================================"
 echo "Starting Chat4All API Service..."
 echo "========================================"
 
+# Wait for Kafka to be ready
+echo "Waiting for Kafka to be ready..."
+MAX_WAIT=30
+ELAPSED=0
+until nc -z kafka 9093 2>/dev/null; do
+  if [ $ELAPSED -ge $MAX_WAIT ]; then
+    echo "⚠️  Kafka not ready after ${MAX_WAIT}s, proceeding anyway (lazy init will retry)"
+    break
+  fi
+  echo "Kafka is unavailable - sleeping (${ELAPSED}s/${MAX_WAIT}s)"
+  sleep 2
+  ELAPSED=$((ELAPSED + 2))
+done
+echo "✓ Kafka is ready"
+
 # Start gRPC server in background
 echo "[1/2] Starting gRPC server on port 50051..."
 php src/server.php &

@@ -12,7 +12,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 })
 export class AppComponent implements OnInit {
   // API Base URL
-  private apiUrl = 'http://localhost:8080/api';
+  private apiUrl = `http://${window.location.hostname}:8080/api`;
 
   // Estado da aplicação
   currentView: 'login' | 'register' | 'chat' = 'login';
@@ -32,20 +32,20 @@ export class AppComponent implements OnInit {
   selectedConversation: any = null;
   messages: any[] = [];
   newMessage = '';
-  
+
   // Criar conversa/grupo
   showCreateConversation = false;
   otherUserId = ''; // Para conversa privada
   groupName = '';
   groupMembers = ''; // IDs separados por vírgula
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient) { }
 
   ngOnInit() {
     // Verificar se tem token salvo
     const savedToken = localStorage.getItem('auth_token');
     const savedUser = localStorage.getItem('current_user');
-    
+
     if (savedToken && savedUser) {
       this.authToken = savedToken;
       this.currentUser = JSON.parse(savedUser);
@@ -70,14 +70,14 @@ export class AppComponent implements OnInit {
         this.currentUser = response.user;
         this.isAuthenticated = true;
         this.currentView = 'chat';
-        
+
         // Salvar no localStorage
         localStorage.setItem('auth_token', this.authToken);
         localStorage.setItem('current_user', JSON.stringify(this.currentUser));
-        
+
         // Carregar conversas
         this.loadConversations();
-        
+
         alert('Login realizado com sucesso!');
       } else {
         alert('Erro no login: ' + response.message);
@@ -147,7 +147,7 @@ export class AppComponent implements OnInit {
   async selectConversation(conversation: any) {
     this.selectedConversation = conversation;
     await this.loadMessages();
-    
+
     // Auto-refresh a cada 3 segundos
     setInterval(() => {
       if (this.selectedConversation) {

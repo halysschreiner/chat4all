@@ -11,12 +11,15 @@ use Monolog\Logger;
  */
 class KafkaProducer
 {
-    private Producer $producer;
-    private ProducerTopic $topic;
+    private ?Producer $producer = null;
+    private ?ProducerTopic $topic = null;
     private Logger $logger;
+    private string $brokers;
+    private string $topicName;
+    private bool $connected = false;
 
     /**
-     * Construtor - inicializa produtor Kafka
+     * Construtor - configura produtor Kafka (lazy initialization)
      */
     public function __construct(
         string $brokers,
@@ -24,25 +27,49 @@ class KafkaProducer
         Logger $logger
     ) {
         $this->logger = $logger;
+        $this->brokers = $brokers;
+        $this->topicName = $topicName;
 
-        try {
-            // Criar instância do Producer
-            $this->producer = new Producer();
-            
-            // Adicionar brokers
-            $this->producer->addBrokers($brokers);
+        $this->logger->info("Kafka producer configured (lazy init)", [
+            'brokers' => $brokers,
+            'topic' => $topicName
+        ]);
+    }
 
-            // Criar tópico
-            $this->topic = $this->producer->newTopic($topicName);
-
-            $this->logger->info("Kafka producer initialized", [
-                'brokers' => $brokers,
-                'topic' => $topicName
-            ]);
-        } catch (\Exception $e) {
-            $this->logger->error('Failed to initialize Kafka producer: ' . $e->getMessage());
-            throw $e;
+    /**
+     * Conectar ao Kafka com retry logic e exponential backoff
+     */
+    private function connect(): void
+    {
+        if ($this->connected) {
+            return;
         }
+
+        $maxRetries = 5;
+        $retryDelay = 1; // segundos
+
+        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+            try {
+                $this->producer = new Producer();
+                $this->producer->addBrokers($this->brokers);
+                $this->topic = $this->producer->newTopic($this->topicName);
+                $this->connected = true;
+                
+                $this->logger->info("Kafka producer connected successfully", [
+                    'attempt' => $attempt
+                ]);
+                return;
+            } catch (\Exception $e) {
+                $this->logger->warning("Kafka connection attempt $attempt/$maxRetries failed: " . $e->getMessage());
+                
+                if ($attempt < $maxRetries) {
+                    sleep($retryDelay);
+                    $retryDelay *= 2; // exponential backoff
+                }
+            }
+        }
+
+        throw new \RuntimeException("Failed to connect to Kafka after $maxRetries attempts");
     }
 
     /**
@@ -53,6 +80,9 @@ class KafkaProducer
      */
     public function publish(array $message, ?string $key = null): void
     {
+        // Lazy initialization - conecta apenas quando necessário
+        $this->connect();
+        
         try {
             $payload = json_encode($message);
 
