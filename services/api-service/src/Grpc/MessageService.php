@@ -40,18 +40,18 @@ class MessageService
         SendMessageRequest $request
     ): SendMessageResponse {
         $response = new SendMessageResponse();
-        
+
         try {
             $conversationId = $request->getConversationId();
             $fromUserId = $request->getFromUserId();
             $content = $request->getContent();
             $messageType = $request->getMessageType() ?: 'text';
             $fileId = $request->getFileId() ?: null;
-            
+
             // Create message payload
             $messageId = Uuid::uuid4()->toString();
             $timestamp = date('Y-m-d H:i:s');
-            
+
             $payload = [
                 'message_id' => $messageId,
                 'conversation_id' => $conversationId,
@@ -62,28 +62,29 @@ class MessageService
                 'status' => 'SENT',
                 'created_at' => $timestamp
             ];
-            
+
             // Save to database first (Outbox pattern or just simple save)
             // For this architecture, we save to DB then send to Kafka for async processing
             $this->database->insertMessage($payload);
-            
+
             // Send to Kafka
             $this->kafkaProducer->publish(
                 $payload,
                 $conversationId // Key (partition by conversation)
             );
-            
+
             // Notify all other participants in the conversation via WebSocket
             $this->notifyConversationParticipants(
                 $conversationId,
                 $fromUserId,
                 $messageId,
-                $content
+                $content,
+                $payload
             );
-            
+
             $response->setSuccess(true);
             $response->setMessage("Message sent to queue");
-            
+
             // Construct returned message object
             $msg = new Message();
             $msg->setMessageId($messageId);
@@ -96,20 +97,20 @@ class MessageService
             if ($fileId) {
                 $msg->setFileId($fileId);
             }
-            
+
             $response->setSentMessage($msg);
-            
+
             $this->logger->info("Message sent to Kafka", ['id' => $messageId]);
-            
+
         } catch (\Exception $e) {
             $this->logger->error("Error sending message: " . $e->getMessage());
             $response->setSuccess(false);
             $response->setMessage($e->getMessage());
         }
-        
+
         return $response;
     }
-    
+
     /**
      * Notify all participants in a conversation about a new message
      */
@@ -117,27 +118,29 @@ class MessageService
         string $conversationId,
         string $senderId,
         string $messageId,
-        string $preview
+        string $preview,
+        array $messageData = []
     ): void {
         try {
             // Get all participants in the conversation except sender
             $participants = $this->database->getConversationParticipants($conversationId);
-            
+
             foreach ($participants as $participant) {
                 $participantId = $participant['user_id'];
-                
+
                 // Don't notify the sender
                 if ($participantId === $senderId) {
                     continue;
                 }
-                
+
                 $this->notificationService->notifyNewMessage(
                     $participantId,
                     $senderId,
                     $conversationId,
-                    substr($preview, 0, 100) // Truncate preview
+                    substr($preview, 0, 100), // Truncate preview
+                    $messageData
                 );
-                
+
                 $this->logger->debug("Notified participant about new message", [
                     'participant_id' => $participantId,
                     'conversation_id' => $conversationId,
@@ -154,24 +157,24 @@ class MessageService
         ListMessagesRequest $request
     ): ListMessagesResponse {
         $response = new ListMessagesResponse();
-        
+
         try {
             $conversationId = $request->getConversationId();
             $userId = $request->getUserId();
             $limit = $request->getLimit() ?: 50;
             $offset = $request->getOffset() ?: 0;
-            
+
             $this->logger->info('ListMessages called', [
                 'conversation_id' => $conversationId,
                 'user_id' => $userId,
                 'limit' => $limit,
                 'offset' => $offset
             ]);
-            
+
             // Marcar mensagens SENT como DELIVERED quando o destinatário as buscar
             // Apenas para mensagens que NÃO foram enviadas pelo usuário atual
             $deliveredCount = $this->database->markMessagesAsDelivered($conversationId, $userId);
-            
+
             if ($deliveredCount > 0) {
                 $this->logger->info('Messages marked as delivered', [
                     'conversation_id' => $conversationId,
@@ -194,9 +197,9 @@ class MessageService
                     'recipient_user_id' => $userId
                 ]);
             }
-            
+
             $messagesData = $this->database->getMessagesByConversation($conversationId, $limit, $offset);
-            
+
             $messages = [];
             foreach ($messagesData as $data) {
                 $msg = new Message();
@@ -211,26 +214,28 @@ class MessageService
                 if (!empty($data['file_id'])) {
                     $msg->setFileId($data['file_id']);
                 }
-                
+
                 $messages[] = $msg;
             }
-            
+
             $response->setSuccess(true);
             $response->setMessages($messages);
-            
+
         } catch (\Exception $e) {
             $this->logger->error("Error listing messages: " . $e->getMessage());
             $response->setSuccess(false);
         }
-        
+
         return $response;
     }
-    
-    public function MarkAsRead(MarkAsReadRequest $request): MarkAsReadResponse {
+
+    public function MarkAsRead(MarkAsReadRequest $request): MarkAsReadResponse
+    {
         return new MarkAsReadResponse();
     }
-    
-    public function UpdateMessageStatus(UpdateMessageStatusRequest $request): UpdateMessageStatusResponse {
+
+    public function UpdateMessageStatus(UpdateMessageStatusRequest $request): UpdateMessageStatusResponse
+    {
         return new UpdateMessageStatusResponse();
     }
 }

@@ -116,9 +116,10 @@ class NotificationService
         string $recipientId,
         string $senderId,
         string $conversationId,
-        ?string $preview = null
+        ?string $preview = null,
+        array $messageData = []
     ): bool {
-        $data = [
+        $defaultData = [
             'event_type' => 'new_message',
             'recipient_id' => $recipientId,
             'sender_id' => $senderId,
@@ -127,9 +128,14 @@ class NotificationService
             'timestamp' => time(),
         ];
 
+        // Merge message details (id, content, etc) into the event data
+        // This ensures the frontend receives the full message object
+        $data = array_merge($messageData, $defaultData);
+
         $this->logger->info('Enviando notificação de nova mensagem', [
             'recipientId' => $recipientId,
             'conversationId' => $conversationId,
+            'hasMessageData' => !empty($messageData)
         ]);
 
         return $this->redis->publish(self::CHANNEL_MESSAGES, $data);

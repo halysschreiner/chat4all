@@ -251,10 +251,9 @@ export class ChatService implements OnDestroy {
   /**
    * Listen for new message events via WebSocket
    * Returns an Observable that emits when a new message is received
+   * The WebsocketService already unwraps the message, so we get the raw message object directly
    */
   onNewMessage(): Observable<any> {
-    return this.websocketService.getMessages().pipe(
-      filter((msg: any) => msg.type === 'status_update' && msg.data?.event === 'new_message')
-    );
+    return this.websocketService.getMessages();
   }
 }

@@ -58,15 +58,22 @@ export class ChatComponent implements OnInit, AfterViewChecked, OnDestroy {
     // Listen for new messages via WebSocket (no polling!)
     this.chatService.onNewMessage().pipe(
       takeUntil(this.destroy$)
-    ).subscribe(event => {
-      console.log('[Chat] New message event received:', event);
+    ).subscribe((message: any) => {
+      console.log('[Chat] New message event received:', message);
 
-      // Reload messages if we're viewing this conversation
-      if (this.selectedConversation && event.conversation_id === this.selectedConversation.conversation_id) {
-        this.loadMessages(this.selectedConversation.conversation_id);
+      if (this.selectedConversation && message.conversation_id === this.selectedConversation.conversation_id) {
+        // Optimistic update: Add message directly if not already present
+        const exists = this.messages.some((m: any) => m.message_id === message.message_id);
+        if (!exists) {
+          console.log('[Chat] Appending new message directly to UI');
+          this.messages.push(message);
+          this.scrollToBottom();
+        } else {
+          console.log('[Chat] Message already exists in UI');
+        }
       }
 
-      // Always reload conversations to update unread counts
+      // Reload conversations to update unread counts
       this.loadConversations();
     });
   }
