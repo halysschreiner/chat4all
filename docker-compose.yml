@@ -15,7 +15,7 @@ services:
     networks:
       - chat4all-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U chat4all_user -d chat4all"]
+      test: [ "CMD-SHELL", "pg_isready -U chat4all_user -d chat4all" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -31,7 +31,7 @@ services:
     networks:
       - chat4all-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -41,8 +41,8 @@ services:
     image: minio/minio:latest
     container_name: chat4all-minio
     ports:
-      - "9001:9000"  # API
-      - "9002:9001"  # Console Web
+      - "9001:9000" # API
+      - "9002:9001" # Console Web
     environment:
       MINIO_ROOT_USER: chat4all_admin
       MINIO_ROOT_PASSWORD: chat4all_minio_pass
@@ -52,7 +52,7 @@ services:
     networks:
       - chat4all-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
       interval: 30s
       timeout: 20s
       retries: 3
@@ -67,7 +67,7 @@ services:
     networks:
       - chat4all-network
     healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      test: [ "CMD", "nc", "-z", "localhost", "2181" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -115,7 +115,7 @@ services:
     networks:
       - chat4all-network
     healthcheck:
-      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      test: [ "CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list" ]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -194,9 +194,9 @@ services:
       dockerfile: Dockerfile
     container_name: chat4all-websocket
     ports:
-      - "8081:8081"
+      - "3333:3333"
     environment:
-      WEBSOCKET_PORT: 8081
+      WEBSOCKET_PORT: 3333
       REDIS_HOST: redis
       REDIS_PORT: 6379
       JWT_SECRET: your-secret-key-change-in-production
@@ -210,7 +210,7 @@ services:
       - chat4all-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "8081"]
+      test: [ "CMD", "nc", "-z", "localhost", "3333" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -265,7 +265,7 @@ services:
       - chat4all-network
 
   # ===== MONITORING STACK =====
-  
+
   # Prometheus - Metrics collection
   prometheus:
     image: prom/prometheus:latest

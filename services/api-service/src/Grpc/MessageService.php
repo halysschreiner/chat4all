@@ -4,6 +4,7 @@ namespace Chat4All\Api\Grpc;
 
 use Chat4All\Api\Database\Database;
 use Chat4All\Api\Service\KafkaProducer;
+use Chat4All\Api\Service\NotificationService;
 use Message\SendMessageRequest;
 use Message\SendMessageResponse;
 use Message\ListMessagesRequest;
@@ -20,15 +21,18 @@ class MessageService
 {
     private Database $database;
     private KafkaProducer $kafkaProducer;
+    private NotificationService $notificationService;
     private Logger $logger;
 
     public function __construct(
         Database $database,
         KafkaProducer $kafkaProducer,
+        NotificationService $notificationService,
         Logger $logger
     ) {
         $this->database = $database;
         $this->kafkaProducer = $kafkaProducer;
+        $this->notificationService = $notificationService;
         $this->logger = $logger;
     }
 
@@ -69,6 +73,14 @@ class MessageService
                 $conversationId // Key (partition by conversation)
             );
             
+            // Notify all other participants in the conversation via WebSocket
+            $this->notifyConversationParticipants(
+                $conversationId,
+                $fromUserId,
+                $messageId,
+                $content
+            );
+            
             $response->setSuccess(true);
             $response->setMessage("Message sent to queue");
             
@@ -96,6 +108,46 @@ class MessageService
         }
         
         return $response;
+    }
+    
+    /**
+     * Notify all participants in a conversation about a new message
+     */
+    private function notifyConversationParticipants(
+        string $conversationId,
+        string $senderId,
+        string $messageId,
+        string $preview
+    ): void {
+        try {
+            // Get all participants in the conversation except sender
+            $participants = $this->database->getConversationParticipants($conversationId);
+            
+            foreach ($participants as $participant) {
+                $participantId = $participant['user_id'];
+                
+                // Don't notify the sender
+                if ($participantId === $senderId) {
+                    continue;
+                }
+                
+                $this->notificationService->notifyNewMessage(
+                    $participantId,
+                    $senderId,
+                    $conversationId,
+                    substr($preview, 0, 100) // Truncate preview
+                );
+                
+                $this->logger->debug("Notified participant about new message", [
+                    'participant_id' => $participantId,
+                    'conversation_id' => $conversationId,
+                    'message_id' => $messageId
+                ]);
+            }
+        } catch (\Exception $e) {
+            // Don't fail the message send if notification fails
+            $this->logger->warning("Failed to notify participants: " . $e->getMessage());
+        }
     }
 
     public function ListMessages(

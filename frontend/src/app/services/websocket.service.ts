@@ -2,6 +2,7 @@ import { Injectable, OnDestroy } from '@angular/core';
 import { BehaviorSubject, Observable, Subject, timer } from 'rxjs';
 import { takeUntil, filter } from 'rxjs/operators';
 import { AuthService } from './auth.service';
+import { EnvironmentService } from './environment.service';
 
 export interface StatusUpdate {
   type: 'status_update';
@@ -23,13 +24,13 @@ export type ConnectionState = 'connecting' | 'connected' | 'disconnected' | 'err
   providedIn: 'root'
 })
 export class WebsocketService implements OnDestroy {
-  private wsUrl = 'ws://localhost:8081';
+  private wsUrl: string;
   private socket: WebSocket | null = null;
   private destroy$ = new Subject<void>();
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
-  
+
   // Subjects for different event types
   private connectionState$ = new BehaviorSubject<ConnectionState>('disconnected');
   private statusUpdates$ = new Subject<StatusUpdate>();
@@ -39,7 +40,14 @@ export class WebsocketService implements OnDestroy {
   // Subscribed conversations
   private subscribedConversations = new Set<string>();
 
-  constructor(private authService: AuthService) {
+  constructor(
+    private authService: AuthService,
+    private env: EnvironmentService
+  ) {
+    // Use centralized URL from EnvironmentService
+    this.wsUrl = this.env.websocketUrl;
+    console.log('[WebsocketService] Using WebSocket URL:', this.wsUrl);
+
     // Auto-connect when user is authenticated
     this.authService.currentUser.pipe(
       takeUntil(this.destroy$),
@@ -94,7 +102,17 @@ export class WebsocketService implements OnDestroy {
       console.log('[WebSocket] ✅ Connected');
       this.connectionState$.next('connected');
       this.reconnectAttempts = 0;
-      
+
+      // Send authentication message
+      const user = this.authService.currentUserValue;
+      if (user?.token) {
+        this.socket?.send(JSON.stringify({
+          type: 'auth',
+          token: user.token
+        }));
+        console.log('[WebSocket] 🔐 Auth message sent');
+      }
+
       // Re-subscribe to all conversations
       this.subscribedConversations.forEach(convId => {
         this.subscribeToConversation(convId);
@@ -103,16 +121,33 @@ export class WebsocketService implements OnDestroy {
 
     this.socket.onmessage = (event) => {
       try {
-        const data: WebSocketMessage = JSON.parse(event.data);
-        console.log('[WebSocket] 📥 Message received:', data.type);
-        
-        // Emit to general messages stream
-        this.messages$.next(data);
-        
-        // Handle specific message types
-        if (data.type === 'status_update') {
-          this.statusUpdates$.next(data as StatusUpdate);
+        const payload = JSON.parse(event.data);
+        console.log('[WebSocket] 📥 Message received:', payload.type);
+
+        if (payload.type === 'status_update' && payload.data) {
+          const internalData = payload.data;
+
+          // Case 1: New Message Event
+          if (internalData.event === 'new_message') {
+            console.log('[WebSocket] Processing new message event');
+            // Unwrap the inner message and emit as a generic message
+            this.messages$.next(internalData.message);
+          }
+          // Case 2: Status Update (Read/Delivered)
+          else {
+            if (internalData.message_id && internalData.status) {
+              console.log('[WebSocket] Processing status update', internalData);
+              this.statusUpdates$.next(internalData as StatusUpdate);
+            } else {
+              console.warn('[WebSocket] Ignored malformed status update:', internalData);
+            }
+          }
         }
+        // Handle other top-level message types if any
+        else {
+          this.messages$.next(payload);
+        }
+
       } catch (error) {
         console.error('[WebSocket] Error parsing message:', error);
       }
@@ -127,7 +162,7 @@ export class WebsocketService implements OnDestroy {
     this.socket.onclose = (event) => {
       console.log('[WebSocket] 🔌 Disconnected:', event.code, event.reason);
       this.connectionState$.next('disconnected');
-      
+
       // Reconnect if not intentionally closed
       if (event.code !== 1000) {
         this.scheduleReconnect();
@@ -158,9 +193,9 @@ export class WebsocketService implements OnDestroy {
 
     const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts);
     this.reconnectAttempts++;
-    
+
     console.log(`[WebSocket] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
-    
+
     timer(delay).pipe(
       takeUntil(this.destroy$)
     ).subscribe(() => {
@@ -173,10 +208,10 @@ export class WebsocketService implements OnDestroy {
    */
   subscribeToConversation(conversationId: string): void {
     this.subscribedConversations.add(conversationId);
-    
+
     if (this.socket?.readyState === WebSocket.OPEN) {
       this.send({
-        action: 'subscribe',
+        type: 'subscribe',
         conversation_id: conversationId
       });
       console.log('[WebSocket] Subscribed to conversation:', conversationId);
@@ -188,10 +223,10 @@ export class WebsocketService implements OnDestroy {
    */
   unsubscribeFromConversation(conversationId: string): void {
     this.subscribedConversations.delete(conversationId);
-    
+
     if (this.socket?.readyState === WebSocket.OPEN) {
       this.send({
-        action: 'unsubscribe',
+        type: 'unsubscribe',
         conversation_id: conversationId
       });
       console.log('[WebSocket] Unsubscribed from conversation:', conversationId);

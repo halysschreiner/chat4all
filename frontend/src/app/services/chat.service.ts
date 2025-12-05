@@ -1,9 +1,10 @@
 import { Injectable, OnDestroy } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable, Subject, BehaviorSubject } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
+import { takeUntil, filter } from 'rxjs/operators';
 import { AuthService } from './auth.service';
 import { WebsocketService, StatusUpdate } from './websocket.service';
+import { EnvironmentService } from './environment.service';
 
 export interface Message {
   message_id: string;
@@ -25,8 +26,8 @@ export interface Message {
   providedIn: 'root'
 })
 export class ChatService implements OnDestroy {
-  private apiUrl = `http://${window.location.hostname}:8000/v1`;
-  private fileApiUrl = `http://${window.location.hostname}:8080/v1`; // API Service direto para arquivos
+  private apiUrl: string;
+  private fileApiUrl: string;
 
   private destroy$ = new Subject<void>();
 
@@ -36,8 +37,16 @@ export class ChatService implements OnDestroy {
   constructor(
     private http: HttpClient,
     private authService: AuthService,
-    private websocketService: WebsocketService
+    private websocketService: WebsocketService,
+    private env: EnvironmentService
   ) {
+    // Use centralized URLs from EnvironmentService
+    this.apiUrl = this.env.apiGatewayUrl;
+    this.fileApiUrl = this.env.apiServiceUrl;
+
+    console.log('[ChatService] Using API URL:', this.apiUrl);
+    console.log('[ChatService] Using File API URL:', this.fileApiUrl);
+
     // Escutar atualizações de status do WebSocket
     this.websocketService.getStatusUpdates().pipe(
       takeUntil(this.destroy$)
@@ -237,5 +246,15 @@ export class ChatService implements OnDestroy {
    */
   isWebSocketConnected(): boolean {
     return this.websocketService.isConnected();
+  }
+
+  /**
+   * Listen for new message events via WebSocket
+   * Returns an Observable that emits when a new message is received
+   */
+  onNewMessage(): Observable<any> {
+    return this.websocketService.getMessages().pipe(
+      filter((msg: any) => msg.type === 'status_update' && msg.data?.event === 'new_message')
+    );
   }
 }

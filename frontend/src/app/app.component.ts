@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { EnvironmentService } from './services/environment.service';
 
 /**
  * Componente principal do Chat4All
@@ -11,8 +12,8 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
   styleUrls: ['./app.component.css']
 })
 export class AppComponent implements OnInit {
-  // API Base URL
-  private apiUrl = `http://${window.location.hostname}:8080/api`;
+  // API Base URL - from EnvironmentService
+  private apiUrl: string;
 
   // Estado da aplicação
   currentView: 'login' | 'register' | 'chat' = 'login';
@@ -39,7 +40,13 @@ export class AppComponent implements OnInit {
   groupName = '';
   groupMembers = ''; // IDs separados por vírgula
 
-  constructor(private http: HttpClient) { }
+  constructor(
+    private http: HttpClient,
+    private env: EnvironmentService
+  ) {
+    this.apiUrl = this.env.legacyApiUrl;
+    console.log('[AppComponent] Using API URL:', this.apiUrl);
+  }
 
   ngOnInit() {
     // Verificar se tem token salvo
@@ -147,13 +154,7 @@ export class AppComponent implements OnInit {
   async selectConversation(conversation: any) {
     this.selectedConversation = conversation;
     await this.loadMessages();
-
-    // Auto-refresh a cada 3 segundos
-    setInterval(() => {
-      if (this.selectedConversation) {
-        this.loadMessages();
-      }
-    }, 3000);
+    // WebSocket handles real-time updates - no polling needed
   }
 
   /**

@@ -32,9 +32,10 @@ COPY services/api-service/ .
 # Copy custom php.ini
 COPY services/api-service/php.ini /usr/local/etc/php/conf.d/custom.ini
 
-# Copy start script
-COPY services/api-service/start.sh /app/start.sh
-RUN chmod +x /app/start.sh
+# Create start script inline to avoid Windows line ending issues
+# Added auto-restart for gRPC server with error logging
+RUN apk add --no-cache netcat-openbsd && \
+	printf '#!/bin/sh\nset -e\necho "Starting Chat4All API Service..."\necho "Waiting for Kafka..."\nMAX_WAIT=30\nELAPSED=0\nuntil nc -z kafka 9093 2>/dev/null; do\n  if [ $ELAPSED -ge $MAX_WAIT ]; then\n    echo "Kafka not ready, proceeding anyway"\n    break\n  fi\n  sleep 2\n  ELAPSED=$((ELAPSED + 2))\ndone\n\n# Function to run gRPC server with auto-restart\nrun_grpc() {\n  while true; do\n    echo "[$(date)] Starting gRPC server on port 50051..."\n    php src/server.php 2>&1 | tee -a /tmp/grpc.log\n    echo "[$(date)] gRPC server exited, restarting in 2s..."\n    sleep 2\n  done\n}\n\n# Start gRPC server in background with auto-restart\nrun_grpc &\nGRPC_PID=$!\n\necho "Starting HTTP REST server on port 8080..."\nphp -S 0.0.0.0:8080 -t public public/router.php\n\nwait -n\nexit $?\n' > /app/start.sh && chmod +x /app/start.sh
 
 # Expose gRPC port and HTTP port
 EXPOSE 50051

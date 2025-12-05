@@ -16,10 +16,10 @@ export class ChatComponent implements OnInit, AfterViewChecked, OnDestroy {
   messages: any[] = [];
   newMessage = '';
   currentUser: any;
-  
+
   showNewConversationModal = false;
   showNewGroupModal = false;
-  
+
   newConversationUserId = '';
   newGroupName = '';
   newGroupMembers = '';
@@ -31,7 +31,7 @@ export class ChatComponent implements OnInit, AfterViewChecked, OnDestroy {
 
   // WebSocket connection state
   connectionState: string = 'disconnected';
-  
+
   private destroy$ = new Subject<void>();
 
   @ViewChild('scrollMe') private myScrollContainer!: ElementRef;
@@ -46,7 +46,7 @@ export class ChatComponent implements OnInit, AfterViewChecked, OnDestroy {
 
   ngOnInit() {
     this.loadConversations();
-    
+
     // Escutar estado da conexão WebSocket
     this.chatService.getConnectionState().pipe(
       takeUntil(this.destroy$)
@@ -54,20 +54,27 @@ export class ChatComponent implements OnInit, AfterViewChecked, OnDestroy {
       this.connectionState = state;
       console.log('[Chat] WebSocket connection state:', state);
     });
-    
-    // Poll for new messages every 10 seconds (WebSocket handles real-time updates)
-    setInterval(() => {
-      if (this.selectedConversation) {
+
+    // Listen for new messages via WebSocket (no polling!)
+    this.chatService.onNewMessage().pipe(
+      takeUntil(this.destroy$)
+    ).subscribe(event => {
+      console.log('[Chat] New message event received:', event);
+
+      // Reload messages if we're viewing this conversation
+      if (this.selectedConversation && event.conversation_id === this.selectedConversation.conversation_id) {
         this.loadMessages(this.selectedConversation.conversation_id);
       }
+
+      // Always reload conversations to update unread counts
       this.loadConversations();
-    }, 10000);
+    });
   }
 
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();
-    
+
     // Unsubscribe from current conversation
     if (this.selectedConversation) {
       this.chatService.unsubscribeFromConversation(this.selectedConversation.conversation_id);
@@ -81,7 +88,7 @@ export class ChatComponent implements OnInit, AfterViewChecked, OnDestroy {
   scrollToBottom(): void {
     try {
       this.myScrollContainer.nativeElement.scrollTop = this.myScrollContainer.nativeElement.scrollHeight;
-    } catch(err) { }
+    } catch (err) { }
   }
 
   loadConversations() {
@@ -97,13 +104,13 @@ export class ChatComponent implements OnInit, AfterViewChecked, OnDestroy {
     if (this.selectedConversation) {
       this.chatService.unsubscribeFromConversation(this.selectedConversation.conversation_id);
     }
-    
+
     this.selectedConversation = conversation;
     this.loadMessages(conversation.conversation_id);
-    
+
     // Subscribe to WebSocket updates for this conversation
     this.chatService.subscribeToConversation(conversation.conversation_id);
-    
+
     // Marcar mensagens como lidas quando selecionar a conversa
     this.markConversationAsRead(conversation.conversation_id);
   }
@@ -112,12 +119,12 @@ export class ChatComponent implements OnInit, AfterViewChecked, OnDestroy {
     this.chatService.getMessages(conversationId).subscribe(response => {
       if (response.success) {
         this.messages = response.messages.reverse(); // Show oldest first
-        
+
         // Initialize status tracking for each message
         this.messages.forEach((msg: any) => {
           this.chatService.initializeMessageStatus(msg.message_id, msg.status || 'PENDING');
         });
-        
+
         console.log('Messages loaded:', this.messages);
         console.log('Current user object:', this.currentUser);
         console.log('Current user ID:', this.currentUser?.user?.user_id || this.currentUser?.user_id);
@@ -134,7 +141,7 @@ export class ChatComponent implements OnInit, AfterViewChecked, OnDestroy {
    */
   getStatusIndicator(message: any): string {
     const status = this.chatService.getMessageStatus(message.message_id) || message.status || 'PENDING';
-    
+
     switch (status) {
       case 'SENT':
         return '✓';
@@ -154,7 +161,7 @@ export class ChatComponent implements OnInit, AfterViewChecked, OnDestroy {
    */
   getStatusClass(message: any): string {
     const status = this.chatService.getMessageStatus(message.message_id) || message.status || 'PENDING';
-    
+
     switch (status) {
       case 'READ':
         return 'status-read';
@@ -313,15 +320,12 @@ export class ChatComponent implements OnInit, AfterViewChecked, OnDestroy {
 
   downloadFile(fileId: string) {
     console.log('Download file called with fileId:', fileId);
-    
-    // Usar o serviço HTTP do Angular que já inclui o token
-    const url = `http://localhost:8080/v1/files/${fileId}/download`;
-    
+
     this.chatService.downloadFile(fileId).subscribe({
       next: (blob: Blob) => {
         // Criar URL temporária para o blob
         const blobUrl = window.URL.createObjectURL(blob);
-        
+
         // Criar link temporário e clicar nele para iniciar download
         const link = document.createElement('a');
         link.href = blobUrl;
@@ -329,7 +333,7 @@ export class ChatComponent implements OnInit, AfterViewChecked, OnDestroy {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        
+
         // Limpar URL temporária
         window.URL.revokeObjectURL(blobUrl);
       },
@@ -347,7 +351,7 @@ export class ChatComponent implements OnInit, AfterViewChecked, OnDestroy {
 
   startPrivateConversation() {
     if (!this.newConversationUserId) return;
-    
+
     this.chatService.createPrivateConversation(this.newConversationUserId)
       .subscribe({
         next: (response) => {
@@ -368,9 +372,9 @@ export class ChatComponent implements OnInit, AfterViewChecked, OnDestroy {
 
   createGroup() {
     if (!this.newGroupName || !this.newGroupMembers) return;
-    
+
     const members = this.newGroupMembers.split(',').map(id => id.trim());
-    
+
     this.chatService.createGroupConversation(this.newGroupName, members)
       .subscribe({
         next: (response) => {

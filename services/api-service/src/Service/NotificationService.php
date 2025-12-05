@@ -83,6 +83,8 @@ class NotificationService
         ?string $errorMessage = null
     ): bool {
         $data = [
+            'event_type' => 'status_update',
+            'sender_id' => $userId, // Mapeia user_id para sender_id para compatibilidade com RedisSubscriber
             'message_id' => $messageId,
             'user_id' => $userId,
             'status' => $status,
@@ -232,7 +234,7 @@ class NotificationService
     {
         // Adiciona o conversation_id como canal específico
         $channel = "conversation:{$conversationId}";
-        
+
         $data = array_merge($notification, [
             'event_type' => 'status_update',
             'conversation_id' => $conversationId,

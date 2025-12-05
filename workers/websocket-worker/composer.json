@@ -10,6 +10,7 @@
         "monolog/monolog": "^3.5",
         "ramsey/uuid": "^4.7",
         "firebase/php-jwt": "^6.10",
+        "clue/redis-react": "^2.6",
         "ext-rdkafka": "*"
     },
     "autoload": {

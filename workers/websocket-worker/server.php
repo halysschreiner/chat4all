@@ -50,9 +50,9 @@ $logger->info('=== WebSocket Server Iniciando ===');
 // Configuração do ambiente
 // ================================================
 $config = [
-    'websocket_port' => (int)getenv('WEBSOCKET_PORT') ?: 8081,
+    'websocket_port' => (int) getenv('WEBSOCKET_PORT') ?: 8081,
     'redis_host' => getenv('REDIS_HOST') ?: 'redis',
-    'redis_port' => (int)getenv('REDIS_PORT') ?: 6379,
+    'redis_port' => (int) getenv('REDIS_PORT') ?: 6379,
     'jwt_secret' => getenv('JWT_SECRET') ?: 'chat4all_secret_key_2024',
     'kafka_brokers' => getenv('KAFKA_BROKERS') ?: 'kafka:9092',
 ];
@@ -73,18 +73,20 @@ $loop = Loop::get();
 $wsHandler = new StatusNotificationHandler($logger, $config);
 
 // ================================================
+// ================================================
 // Configurar Redis Subscriber para eventos
 // ================================================
 $redisSubscriber = new RedisSubscriber(
     $config['redis_host'],
     $config['redis_port'],
     $wsHandler,
-    $logger
+    $logger,
+    $loop
 );
 
-// Registrar subscriber no event loop
-$loop->addPeriodicTimer(0.1, function() use ($redisSubscriber) {
-    $redisSubscriber->processMessages();
+// Heartbeat para debug
+$loop->addPeriodicTimer(5.0, function () use ($logger) {
+    $logger->debug('WebSocket Server Heartbeat - Loop is running');
 });
 
 // ================================================

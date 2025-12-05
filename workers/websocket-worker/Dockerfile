@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y \
     unzip \
     librdkafka-dev \
     libzip-dev \
+    netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 
 # Instalar extensões PHP necessárias
@@ -43,8 +44,8 @@ RUN composer install --no-dev --optimize-autoloader --no-scripts
 # Copiar código fonte
 COPY . .
 
-# Expor porta do WebSocket
-EXPOSE 8081
+# Expor porta do WebSocket (3333)
+EXPOSE 3333
 
 # Comando padrão - iniciar servidor WebSocket
 CMD ["php", "server.php"]

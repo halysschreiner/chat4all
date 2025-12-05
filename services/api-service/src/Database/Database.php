@@ -61,7 +61,7 @@ class Database
             WHERE email = :email AND status = \'active\'
         ');
         $stmt->execute(['email' => $email]);
-        
+
         $user = $stmt->fetch();
         return $user ?: null;
     }
@@ -77,7 +77,7 @@ class Database
             WHERE user_id = :user_id AND status = \'active\'
         ');
         $stmt->execute(['user_id' => $userId]);
-        
+
         $user = $stmt->fetch();
         return $user ?: null;
     }
@@ -93,7 +93,7 @@ class Database
             WHERE username = :username AND status = \'active\'
         ');
         $stmt->execute(['username' => $username]);
-        
+
         $user = $stmt->fetch();
         return $user ?: null;
     }
@@ -109,7 +109,7 @@ class Database
             WHERE (email = :identifier OR phone = :identifier) AND status = \'active\'
         ');
         $stmt->execute(['identifier' => $identifier]);
-        
+
         $user = $stmt->fetch();
         return $user ?: null;
     }
@@ -124,14 +124,14 @@ class Database
             VALUES (:username, :email, :phone, :password_hash)
             RETURNING user_id, username, email, phone, created_at, status
         ');
-        
+
         $stmt->execute([
             'username' => $username,
             'email' => $email,
             'phone' => $phone,
             'password_hash' => $passwordHash
         ]);
-        
+
         return $stmt->fetch();
     }
 
@@ -162,7 +162,7 @@ class Database
         ]);
 
         $result = $stmt->fetch();
-        
+
         // Atualizar última mensagem na conversa
         $this->updateConversationLastMessage(
             $data['conversation_id'],
@@ -219,11 +219,11 @@ class Database
         ?string $timestampField = null
     ): bool {
         $sql = 'UPDATE messages SET status = :status, updated_at = NOW()';
-        
+
         if ($timestampField && in_array($timestampField, ['delivered_at', 'read_at'])) {
             $sql .= ", $timestampField = NOW()";
         }
-        
+
         $sql .= ' WHERE message_id = :message_id';
 
         $stmt = $this->pdo->prepare($sql);
@@ -259,7 +259,7 @@ class Database
         ]);
 
         $count = $stmt->rowCount();
-        
+
         if ($count > 0) {
             $this->logger->info("Marked $count messages as READ in conversation $conversationId by user $userId");
         }
@@ -292,7 +292,7 @@ class Database
         ]);
 
         $count = $stmt->rowCount();
-        
+
         if ($count > 0) {
             $this->logger->info("Marked $count messages as DELIVERED in conversation $conversationId for recipient $recipientUserId");
         }
@@ -354,7 +354,7 @@ class Database
         ]);
 
         $result = $stmt->fetch();
-        return (int)$result['count'];
+        return (int) $result['count'];
     }
 
     /**
@@ -367,7 +367,7 @@ class Database
             FROM conversation_members
             WHERE user_id = :user_id AND conversation_id = :conversation_id
         ');
-        
+
         $stmt->execute([
             'user_id' => $userId,
             'conversation_id' => $conversationId
@@ -548,13 +548,13 @@ class Database
             VALUES (:type, :name, :created_by)
             RETURNING conversation_id
         ');
-        
+
         $stmt->execute([
             'type' => $type,
             'name' => $name,
             'created_by' => $createdBy
         ]);
-        
+
         $result = $stmt->fetch();
         return $result['conversation_id'];
     }
@@ -569,7 +569,7 @@ class Database
             VALUES (:conversation_id, :user_id, :role)
             ON CONFLICT (conversation_id, user_id) DO NOTHING
         ');
-        
+
         $stmt->execute([
             'conversation_id' => $conversationId,
             'user_id' => $userId,
@@ -592,12 +592,12 @@ class Database
             AND cm2.user_id = :user2_id
             LIMIT 1
         ');
-        
+
         $stmt->execute([
             'user1_id' => $user1Id,
             'user2_id' => $user2Id
         ]);
-        
+
         $result = $stmt->fetch();
         return $result ? $result['conversation_id'] : null;
     }
@@ -612,9 +612,10 @@ class Database
         ');
         $stmt->execute(['conversation_id' => $conversationId]);
         $conversation = $stmt->fetch();
-        
-        if (!$conversation) return null;
-        
+
+        if (!$conversation)
+            return null;
+
         // Buscar membros
         $stmtMembers = $this->pdo->prepare('
             SELECT u.user_id, u.username, cm.role, cm.joined_at
@@ -624,8 +625,26 @@ class Database
         ');
         $stmtMembers->execute(['conversation_id' => $conversationId]);
         $conversation['members'] = $stmtMembers->fetchAll();
-        
+
         return $conversation;
+    }
+
+    /**
+     * Get all participants of a conversation
+     * Returns array of user_ids for all members in the conversation
+     */
+    public function getConversationParticipants(string $conversationId): array
+    {
+        $stmt = $this->pdo->prepare('
+            SELECT cm.user_id, u.username
+            FROM conversation_members cm
+            JOIN users u ON cm.user_id = u.user_id
+            WHERE cm.conversation_id = :conversation_id
+        ');
+
+        $stmt->execute(['conversation_id' => $conversationId]);
+
+        return $stmt->fetchAll();
     }
 
     /**
@@ -665,7 +684,7 @@ class Database
         ]);
 
         $result = $stmt->fetch();
-        
+
         $this->logger->info('File metadata inserted', [
             'file_id' => $data['file_id'],
             'size' => $data['file_size'],
@@ -708,10 +727,10 @@ class Database
             FROM files
             WHERE file_id = :file_id
         ');
-        
+
         $stmt->execute(['file_id' => $fileId]);
         $file = $stmt->fetch();
-        
+
         return $file ?: null;
     }
 
@@ -760,9 +779,9 @@ class Database
             WHERE file_id = :file_id
             ORDER BY part_number ASC
         ');
-        
+
         $stmt->execute(['file_id' => $fileId]);
-        
+
         return $stmt->fetchAll();
     }
 
@@ -815,7 +834,7 @@ class Database
         $stmt->bindValue('conversation_id', $conversationId);
         $stmt->bindValue('limit', $limit, PDO::PARAM_INT);
         $stmt->bindValue('offset', $offset, PDO::PARAM_INT);
-        
+
         if ($fileType) {
             // Mapear tipos genéricos para MIME types
             $mimeTypeMap = [
@@ -827,7 +846,7 @@ class Database
             $mimePattern = $mimeTypeMap[$fileType] ?? $fileType . '%';
             $stmt->bindValue('file_type', $mimePattern);
         }
-        
+
         $stmt->execute();
 
         return $stmt->fetchAll();

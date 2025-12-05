@@ -53,19 +53,19 @@ switch ($path) {
         break;
 
     // ===== AUTH ENDPOINTS =====
-    
+
     case '/v1/auth/register':
         if ($requestMethod === 'POST') {
             $data = json_decode(file_get_contents('php://input'), true);
-            
+
             $request = new Auth\RegisterRequest();
             $request->setUsername($data['username'] ?? '');
             $request->setEmail($data['email'] ?? '');
             $request->setPhone($data['phone'] ?? '');
             $request->setPassword($data['password'] ?? '');
-            
+
             list($response, $status) = $authClient->Register($request)->wait();
-            
+
             // Check if response is null or status indicates error
             if ($response === null || !$status->code === 0) {
                 http_response_code(500);
@@ -76,7 +76,7 @@ switch ($path) {
                 ]);
                 break;
             }
-            
+
             echo json_encode([
                 'success' => $response->getSuccess(),
                 'message' => $response->getMessage(),
@@ -94,14 +94,14 @@ switch ($path) {
     case '/v1/auth/login':
         if ($requestMethod === 'POST') {
             $data = json_decode(file_get_contents('php://input'), true);
-            
+
             $request = new Auth\LoginRequest();
             $request->setEmail($data['email'] ?? '');
             $request->setPhone($data['phone'] ?? '');
             $request->setPassword($data['password'] ?? '');
-            
+
             list($response, $status) = $authClient->Login($request)->wait();
-            
+
             // Check if response is null or status indicates error
             if ($response === null || !$status->code === 0) {
                 http_response_code(500);
@@ -112,7 +112,7 @@ switch ($path) {
                 ]);
                 break;
             }
-            
+
             echo json_encode([
                 'success' => $response->getSuccess(),
                 'message' => $response->getMessage(),
@@ -128,20 +128,21 @@ switch ($path) {
         break;
 
     // ===== CONVERSATION ENDPOINTS =====
-    
+
     case '/v1/conversations/private':
         if ($requestMethod === 'POST') {
             $userId = authenticateRequest();
-            if (!$userId) break;
-            
+            if (!$userId)
+                break;
+
             $data = json_decode(file_get_contents('php://input'), true);
-            
+
             $request = new Conversation\CreatePrivateConversationRequest();
             $request->setUserId($userId);
             $request->setOtherUserId($data['other_user_id'] ?? '');
-            
+
             list($response, $status) = $conversationClient->CreatePrivateConversation($request)->wait();
-            
+
             echo json_encode([
                 'success' => $response->getSuccess(),
                 'message' => $response->getMessage(),
@@ -153,20 +154,21 @@ switch ($path) {
     case '/v1/conversations/group':
         if ($requestMethod === 'POST') {
             $userId = authenticateRequest();
-            if (!$userId) break;
-            
+            if (!$userId)
+                break;
+
             $data = json_decode(file_get_contents('php://input'), true);
-            
+
             $request = new Conversation\CreateGroupRequest();
             $request->setUserId($userId);
             $request->setGroupName($data['group_name'] ?? '');
-            
+
             if (!empty($data['member_user_ids'])) {
                 $request->setMemberUserIds($data['member_user_ids']);
             }
-            
+
             list($response, $status) = $conversationClient->CreateGroup($request)->wait();
-            
+
             echo json_encode([
                 'success' => $response->getSuccess(),
                 'message' => $response->getMessage(),
@@ -178,15 +180,16 @@ switch ($path) {
     case '/v1/conversations':
         if ($requestMethod === 'GET') {
             $userId = authenticateRequest();
-            if (!$userId) break;
-            
+            if (!$userId)
+                break;
+
             $request = new Conversation\ListConversationsRequest();
             $request->setUserId($userId);
             $request->setLimit($_GET['limit'] ?? 50);
             $request->setOffset($_GET['offset'] ?? 0);
-            
+
             list($response, $status) = $conversationClient->ListConversations($request)->wait();
-            
+
             $conversations = [];
             foreach ($response->getConversations() as $conv) {
                 $conversations[] = [
@@ -199,7 +202,7 @@ switch ($path) {
                     'members' => formatMembers($conv->getMembers())
                 ];
             }
-            
+
             echo json_encode([
                 'success' => $response->getSuccess(),
                 'conversations' => $conversations
@@ -208,27 +211,39 @@ switch ($path) {
         break;
 
     // ===== MESSAGE ENDPOINTS =====
-    
+
     case '/v1/messages':
         if ($requestMethod === 'POST') {
             $userId = authenticateRequest();
-            if (!$userId) break;
-            
+            if (!$userId)
+                break;
+
             $data = json_decode(file_get_contents('php://input'), true);
-            
+
             $request = new Message\SendMessageRequest();
             $request->setConversationId($data['conversation_id'] ?? '');
             $request->setFromUserId($userId);
             $request->setMessageType($data['message_type'] ?? 'text');
             $request->setContent($data['content'] ?? '');
-            
+
             // Adicionar file_id se fornecido
             if (!empty($data['file_id'])) {
                 $request->setFileId($data['file_id']);
             }
-            
+
             list($response, $status) = $messageClient->SendMessage($request)->wait();
-            
+
+            // Check if response is null (gRPC connection failed)
+            if ($response === null) {
+                http_response_code(500);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Failed to communicate with message service',
+                    'error' => $status ? $status->details : 'No response from gRPC server'
+                ]);
+                break;
+            }
+
             echo json_encode([
                 'success' => $response->getSuccess(),
                 'message' => $response->getMessage(),
@@ -240,23 +255,24 @@ switch ($path) {
     case (preg_match('/^\/v1\/conversations\/(.+)\/messages$/', $path, $matches) ? true : false):
         if ($requestMethod === 'GET') {
             $userId = authenticateRequest();
-            if (!$userId) break;
-            
+            if (!$userId)
+                break;
+
             $conversationId = $matches[1];
-            
+
             $request = new Message\ListMessagesRequest();
             $request->setConversationId($conversationId);
             $request->setUserId($userId);
             $request->setLimit($_GET['limit'] ?? 50);
             $request->setOffset($_GET['offset'] ?? 0);
-            
+
             list($response, $status) = $messageClient->ListMessages($request)->wait();
-            
+
             $messages = [];
             foreach ($response->getMessages() as $msg) {
                 $messages[] = formatMessage($msg);
             }
-            
+
             echo json_encode([
                 'success' => $response->getSuccess(),
                 'messages' => $messages,
@@ -268,16 +284,17 @@ switch ($path) {
     case '/v1/messages/read':
         if ($requestMethod === 'POST') {
             $userId = authenticateRequest();
-            if (!$userId) break;
-            
+            if (!$userId)
+                break;
+
             $data = json_decode(file_get_contents('php://input'), true);
-            
+
             $request = new Message\MarkAsReadRequest();
             $request->setMessageId($data['message_id'] ?? '');
             $request->setUserId($userId);
-            
+
             list($response, $status) = $messageClient->MarkAsRead($request)->wait();
-            
+
             echo json_encode([
                 'success' => $response->getSuccess(),
                 'message' => $response->getMessage()
@@ -288,18 +305,19 @@ switch ($path) {
     case (preg_match('/^\/v1\/conversations\/(.+)\/read$/', $path, $matches) ? true : false):
         if ($requestMethod === 'POST') {
             $userId = authenticateRequest();
-            if (!$userId) break;
-            
+            if (!$userId)
+                break;
+
             $conversationId = $matches[1];
-            
+
             // Fazer chamada HTTP direta ao api-service pois não existe gRPC para isso
             $apiServiceUrl = 'http://' . getenv('API_SERVICE_HOST') . ':' . getenv('API_SERVICE_PORT');
             $url = "{$apiServiceUrl}/v1/conversations/{$conversationId}/read";
-            
+
             // Obter token da requisição atual
             $headers = getallheaders();
             $authHeader = $headers['Authorization'] ?? '';
-            
+
             $ch = curl_init($url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_POST, true);
@@ -307,11 +325,11 @@ switch ($path) {
                 'Authorization: ' . $authHeader,
                 'Content-Type: application/json'
             ]);
-            
+
             $result = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
-            
+
             http_response_code($httpCode);
             echo $result;
         }
@@ -320,29 +338,30 @@ switch ($path) {
     case (preg_match('/^\/v1\/conversations\/(.+)\/unread$/', $path, $matches) ? true : false):
         if ($requestMethod === 'GET') {
             $userId = authenticateRequest();
-            if (!$userId) break;
-            
+            if (!$userId)
+                break;
+
             $conversationId = $matches[1];
-            
+
             // Fazer chamada HTTP direta ao api-service pois não existe gRPC para isso
             $apiServiceUrl = 'http://' . getenv('API_SERVICE_HOST') . ':' . getenv('API_SERVICE_PORT');
             $url = "{$apiServiceUrl}/v1/conversations/{$conversationId}/unread";
-            
+
             // Obter token da requisição atual
             $headers = getallheaders();
             $authHeader = $headers['Authorization'] ?? '';
-            
+
             $ch = curl_init($url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_HTTPHEADER, [
                 'Authorization: ' . $authHeader,
                 'Content-Type: application/json'
             ]);
-            
+
             $result = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
-            
+
             http_response_code($httpCode);
             echo $result;
         }
@@ -360,29 +379,36 @@ switch ($path) {
 function authenticateRequest(): ?string
 {
     global $authClient;
-    
+
     $headers = getallheaders();
     $authHeader = $headers['Authorization'] ?? '';
-    
+
     if (!preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
         http_response_code(401);
         echo json_encode(['error' => 'Token não fornecido']);
         return null;
     }
-    
+
     $token = $matches[1];
-    
+
     $request = new Auth\ValidateTokenRequest();
     $request->setToken($token);
-    
+
     list($response, $status) = $authClient->ValidateToken($request)->wait();
-    
+
+    // Check if response is null (gRPC connection failed)
+    if ($response === null) {
+        http_response_code(500);
+        echo json_encode(['error' => 'Failed to validate token - service unavailable']);
+        return null;
+    }
+
     if (!$response->getValid()) {
         http_response_code(401);
         echo json_encode(['error' => 'Token inválido']);
         return null;
     }
-    
+
     return $response->getUserId();
 }
 
@@ -391,8 +417,9 @@ function authenticateRequest(): ?string
  */
 function formatConversation($conv): ?array
 {
-    if (!$conv) return null;
-    
+    if (!$conv)
+        return null;
+
     return [
         'conversation_id' => $conv->getConversationId(),
         'type' => $conv->getType(),
@@ -426,8 +453,9 @@ function formatMembers($members): array
  */
 function formatMessage($msg): ?array
 {
-    if (!$msg) return null;
-    
+    if (!$msg)
+        return null;
+
     $readBy = [];
     foreach ($msg->getReadBy() as $read) {
         $readBy[] = [
@@ -436,7 +464,7 @@ function formatMessage($msg): ?array
             'read_at' => $read->getReadAt()
         ];
     }
-    
+
     return [
         'message_id' => $msg->getMessageId(),
         'conversation_id' => $msg->getConversationId(),
